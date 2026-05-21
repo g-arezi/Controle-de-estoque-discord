@@ -1,0 +1,55 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: discord_stock_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-discord}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-discord123}
+      POSTGRES_DB: ${POSTGRES_DB:-discord_stock}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-discord}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - discord_network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: discord_stock_bot
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      DISCORD_TOKEN: ${DISCORD_TOKEN}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      ESTOQUE_CHANNEL_ID: ${ESTOQUE_CHANNEL_ID}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
+      PORT: ${PORT:-3000}
+      INFINITEPAY_API_URL: ${INFINITEPAY_API_URL}
+      INFINITEPAY_API_KEY: ${INFINITEPAY_API_KEY}
+      INFINITEPAY_SECRET: ${INFINITEPAY_SECRET}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - discord_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  discord_network:
+    driver: bridge
