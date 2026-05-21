@@ -1,72 +1,102 @@
-# 🛒 Bot de Discord - Controle de Estoque
+# 🛒 Bot de Discord — Controle de Estoque
 
-Bot profissional e robusto para gerenciamento de vendas de produtos digitais e físicos diretamente no Discord.
+Bot profissional para gerenciamento e venda de produtos digitais e físicos via Discord.
 
-## 📋 Índice
+## Sumário
 
-- [Características](#-características)
-- [Requisitos](#-requisitos)
-- [Instalação e Setup](#-instalação-e-setup)
-- [Como Iniciar o Bot](#-como-iniciar-o-bot)
-- [Comandos Disponíveis](#-comandos-disponíveis)
-- [Estrutura do Projeto](#-estrutura-do-projeto)
-- [Configuração](#-configuração)
-- [Troubleshooting](#-troubleshooting)
+- [Sobre](#sobre)
+- [Requisitos](#requisitos)
+- [Quick Start (Docker)](#quick-start-docker)
+- [Instalação Manual](#instalação-manual)
+- [Variáveis de ambiente](#variáveis-de-ambiente)
+- [Comandos do Bot](#comandos-do-bot)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Troubleshooting](#troubleshooting)
 
-## ✨ Características
+## Sobre
 
-### Stack Tecnológico
+Principais tecnologias: Node.js 18+, TypeScript, discord.js v14, Prisma v5, PostgreSQL.
 
-- **Node.js 18+**
-- **TypeScript** com strict mode
-- **discord.js v14** (Framework Discord)
-- **Prisma v5** (ORM)
-- **PostgreSQL 16** (Banco de dados)
-- **Express 4** (Servidor HTTP para webhooks)
+Funcionalidades principais:
+- CRUD de produtos
+- Menu interativo para compra
+- Checkout integrado (suporta InfinitePay)
+- Rate limiting (1 checkout / 30s por usuário)
+- Reservas temporárias e tickets privados para entrega
+- Logging estruturado e transações seguras (SERIALIZABLE)
 
-### Funcionalidades
+## Requisitos
 
-✅ Gerenciamento completo de produtos (CRUD)  
-✅ Menu interativo com detalhes de produtos  
-✅ Imagens e vídeos nos produtos  
-✅ Sistema de checkout integrado  
-✅ Controle de estoque em tempo real  
-✅ Permissões por administrador  
-✅ Rate limiting (1 checkout / 30s por usuário)  
-✅ Logging estruturado em JSON  
-✅ Transações SERIALIZABLE (sem race conditions)  
-✅ Validação rigorosa de entrada
+- Docker & Docker Compose (recomendado)
+- Node.js 18+ (para execução local)
+- PostgreSQL 16+
 
-## 🔧 Requisitos
+## Quick Start (Docker)
 
-### Sistema
+1. Copie e ajuste o arquivo de variáveis de ambiente:
 
-- **Docker e Docker Compose** (recomendado)
-- Ou manualmente:
-  - Node.js 18+
-  - PostgreSQL 16+
-  - npm ou yarn
+```bash
+cp .env.example .env
+# edite .env conforme necessário
+```
 
+2. Build e suba os containers:
 
-- Token do Bot (do Discord Developer Portal)
+```bash
+docker compose up -d --build
+```
 
-## 📦 Instalação e Setup
+3. Aplicar migrations (opcional se o container já executar isso):
 
+```bash
+docker compose exec app npx prisma migrate deploy
+```
 
-#### Passo 1: Configure o arquivo `.env`
+4. Ver logs:
 
-Crie um arquivo `.env` na raiz do projeto:
+```bash
+docker compose logs app -f
+```
+
+## Instalação manual
+
+1. Instale dependências:
+
+```bash
+npm install
+```
+
+2. Configure o banco (exemplo local PostgreSQL):
+
+```bash
+createdb -U postgres discord_stock
+```
+
+3. Rode migrations:
+
+```bash
+npx prisma migrate deploy
+```
+
+4. Compile e inicie:
+
+```bash
+npm run build
+node dist/src/main.js
+```
+
+## Variáveis de ambiente
+
+Crie `.env` na raiz (ou use `.env.example`). Exemplo mínimo:
 
 ```env
 # Discord
 DISCORD_TOKEN=seu_token_aqui
-DISCORD_CLIENT_ID=1367944270769819788
-ESTOQUE_CHANNEL_ID=1503788015779057735
-# DISCORD_GUILD_ID=seu_guild_id (opcional)
+DISCORD_CLIENT_ID=seu_client_id
+ESTOQUE_CHANNEL_ID=seu_channel_id
 
 # PostgreSQL
-POSTGRES_PASSWORD=discord123
-DATABASE_URL=postgresql://discord:discord123@postgres:5432/discord_stock?schema=public
+DATABASE_URL=postgresql://discord:senha@localhost:5432/discord_stock?schema=public
 
 # Servidor
 PORT=3000
@@ -78,325 +108,84 @@ INFINITEPAY_SECRET=seu_secret
 WEBHOOK_SECRET=seu_webhook_secret_minimo_32_chars
 ```
 
-#### Passo 2: Inicie os containers
+## Comandos do bot (resumo)
+
+- `/menu` — Mostra lista de produtos e opções de compra.
+- `/menu-canal` — Mostra produtos filtrados pelo canal (admin recommended).
+- `/comprar id:<produto_id>` — Inicia checkout para o produto.
+- `/estoque` — Grupo de subcomandos admin: `listar`, `adicionar`, `editar`, `remover`, `quantidade`.
+
+Exemplos:
 
 ```bash
-# Build e inicie
-docker compose up -d --build
-# Pare quando necessário
-docker compose down
-
-### Opção 2: Instalação Manual
-
-#### Passo 1: Instale as dependências
-
-```bash
-npm install
-```
-
-createdb -U postgres discord_stock
-# Configure as credenciais no .env (veja acima)
-```
-
-#### Passo 3: Rode as migrações
-
-```bash
-npx prisma migrate deploy
-```
-
-#### Passo 4: Compile o TypeScript
-
-```bash
-npm run build
-### Com Docker (Recomendado)
-```bash
-# Inicie os serviços
-docker compose up -d
-
-# Veja os logs
-docker compose logs app -f
-
-# Reinicie se necessário
-docker compose restart app
-# Pare os serviços
-docker compose down
-```
-
-### Manualmente
-
-```bash
-npm install
-
-# 2. Rode as migrações do banco de dados
-npx prisma migrate deploy
-
-# 3. Compile o TypeScript
-npm run build
-
-# 4. Inicie o bot
-node dist/src/main.js
-```
-
-### Arquivos Úteis
-
-```bash
-# Ver todos os logs
-docker compose logs app --tail 100
-# Ver apenas erros
-docker compose logs app | grep -i error
-
-# Acessar o banco de dados
-docker compose exec postgres psql -U discord -d discord_stock
-```
-
-## 📝 Comandos Disponíveis
-
-### 1️⃣ `/menu` - Menu de Produtos (Público)
-
-Mostra um menu interativo com todos os produtos disponíveis.
-
-**Uso:**
-```
-/menu
-```
-
-**O que faz:**
-- Exibe lista de produtos ativos
-- Cada produto tem um botão para ver detalhes
-- Ao clicar no produto:
-  - Mostra imagem completa (se disponível)
-  - Descrição do produto
-  - Preço
-  - Estoque disponível
-  - Categoria e tipo
-  - Botões: "Comprar Agora" ou "Voltar ao Menu"
-
----
-
-### 2️⃣ `/menu-canal` - Menu Separado por Canal (Admin Only) 🔒
-**Uso:**
-```
-/menu-canal
-```
-
-**O que faz:**
-- Exibe apenas produtos daquele canal
-- Ideal para canais como #items, #skins, #contas
-
-**Exemplo de uso:**
-1. Crie um canal #skins
-2. Adicione produtos com `canal:#skins`
-3. No canal #skins, use `/menu-canal`
-4. Mostrará apenas skins disponíveis!
-
----
-
-### 3️⃣ `/comprar` - Compra Rápida (Público)
-
-Inicia checkout direto de um produto pelo ID.
-
-**Uso:**
-```
+# Comprar por ID (exemplo de uso dentro do Discord)
 /comprar id:prod_1234567890123
-```
 
-**Parâmetros:**
-- `id` (obrigatório): ID do produto a comprar
-
-**O que faz:**
-- Cria um pedido imediatamente
-- Gera link de pagamento
-- Mostra Pix copia e cola (se configurado)
-- Resserva o produto por 10 minutos
-- Quando o pagamento for aprovado, o bot cria um canal privado estilo ticket para a entrega do produto
-
-**Rate Limiting:** Máximo 1 checkout por usuário a cada 30 segundos
-
----
-
-### 4️⃣ `/estoque` - Gerenciamento de Estoque (Admin Only) 🔒
-
-Comando principal com múltiplos subcomandos para administradores.
-
-#### `/estoque listar` - Listar Produtos
-
-```
-/estoque listar
-/estoque listar todos:true
-```
-
-**Parâmetros:**
-- `todos` (opcional): Se `true`, inclui produtos inativos. Padrão: `false`
-
----
-
-#### `/estoque adicionar` - Adicionar Novo Produto
-
-```
-/estoque adicionar 
-  nome:"Meu Produto" 
-  preco:99.90 
-  quantidade:10 
-  categoria:"Eletrônicos"
-  tipo:ITEMS
-  canal:#items
-  descricao:"Descrição completa"
-  imagem:"https://..."
-  video:"https://..."
-```
-
-**Parâmetros Obrigatórios:**
-- `nome` - Nome do produto
-- `preco` - Preço (ex: 99.90)
-- `quantidade` - Quantidade em estoque
-- `categoria` - Categoria do produto
-
-**Parâmetros Opcionais:**
-- `tipo` - Tipo de produto (padrão: DIGITAL)
-  - `ITEMS` - Itens do jogo
-  - `SKINS` - Skins/aparências
-  - `CONTAS` - Contas
-  - `PASSE` - Passe de batalha, eventos ou temporada
-  - `MODS` - Mods, plugins e complementos
-  - `AUXILIARES` - Ferramentas auxiliares e utilitários
-  - `REGEDIT` - Arquivos ou ajustes de registro
-  - `DIGITAL` - Produtos digitais
-- `descricao` - Descrição do produto
-- `video` - URL do vídeo do produto
-
----
-
-#### `/estoque editar` - Editar Produto Existente
-
-  id:prod_1234567890123
-  tipo:SKINS
-  canal:#skins
-  status:ACTIVE
-```
-
-**Parâmetros:**
-- `id` (obrigatório) - ID do produto a editar
-- `nome` (opcional) - Novo nome
-- `preco` (opcional) - Novo preço
-- `categoria` (opcional) - Nova categoria
-- `tipo` (opcional) - Novo tipo (ITEMS, SKINS, CONTAS, PASSE, MODS, AUXILIARES, REGEDIT, DIGITAL, PHYSICAL)
-- `canal` (opcional) - Novo canal para associar o produto
-- `status` (opcional) - ACTIVE ou INACTIVE
-- `descricao` (opcional) - Nova descrição
-- `imagem` (opcional) - Nova URL de imagem
-
----
-
-#### `/estoque remover` - Deletar Produto
-
-```
-/estoque remover id:prod_1234567890123
-```
-⚠️ **Aviso:** Essa ação é permanente!
-
----
-
-#### `/estoque quantidade` - Ajustar Estoque
-
-```
+# Ajustar estoque (admin)
 /estoque quantidade id:prod_1234567890123 quantidade:15
 ```
 
----
-
-## 📚 Tipos de Produtos
-
-O sistema suporta estes tipos de produtos:
-
-| Tipo | Descrição | Exemplo |
-|------|-----------|---------|
-| `ITEMS` | Itens do jogo | Moedas, armas, equipamentos |
-| `SKINS` | Skins/aparências | Skins de jogo, personagens |
-| `CONTAS` | Contas de serviços | Contas de Steam, Discord |
-| `PASSE` | Passe de batalha ou temporada | Battle pass, season pass |
-| `MODS` | Mods e complementos | Mods de jogos, plugins |
-| `AUXILIARES` | Ferramentas auxiliares | Utilitários, launchers |
-| `REGEDIT` | Ajustes de registro | Tweaks, arquivos `.reg` |
-| `DIGITAL` | Produtos digitais | E-books, cursos, softwares |
-| `PHYSICAL` | Produtos físicos | Periféricos, livros |
-
----
-
-## 🎯 Sistema de Canais
-
-```
-#items     - Para vender items
-#skins     - Para vender skins
-#contas    - Para vender contas
-```
-
-**2. Adicione produtos em cada canal:**
-```
-/estoque adicionar 
-  nome:"Skin Diamante" 
-  preco:29.99 
-  quantidade:50 
-  tipo:SKINS 
-  canal:#skins
-
-/estoque adicionar 
-  nome:"Item Ouro" 
-  preco:9.99 
-  quantidade:100 
-  tipo:ITEMS 
-  canal:#items
-```
-
-**3. Poste o menu em cada canal:**
-- No canal `#skins`: `/menu-canal` → Mostra apenas skins
-- No canal `#items`: `/menu-canal` → Mostra apenas items
-- Em qualquer lugar: `/menu` → Mostra todos os produtos
-
-### Benefícios:
-✅ Menus mais limpos e organizados  
-✅ Melhor experiência do cliente  
-✅ Produtos categorizados por tipo  
-✅ Fácil gerenciamento  
-
----
-
-## 📁 Estrutura do Projeto
+## Estrutura do projeto
 
 ```
 .
-├── docker-compose.yml              # Orquestração de containers
-├── Dockerfile                       # Build da aplicação
-├── .env                             # Variáveis de ambiente
-├── package.json                     # Dependências e scripts
-├── tsconfig.json                    # Configuração TypeScript
+├── docker-compose.yml
+├── Dockerfile
+├── .env.example
+├── package.json
+├── tsconfig.json
 ├── prisma/
-│   ├── schema.prisma               # Schema do banco de dados
-│   ├── migrations/                 # Migrations do banco
-│   └── seed.ts                     # Seed de dados
+│   ├── schema.prisma
+│   ├── migrations/
+│   └── seed.ts
 ├── src/
-│   ├── main.ts                     # Ponto de entrada
-│   ├── config/
-│   │   ├── env.ts                  # Validação de env vars
-│   │   └── prisma.ts               # Cliente Prisma
+│   ├── main.ts
++│   ├── config/
 │   ├── discord/
-│   │   ├── commands.ts             # Definição de slash commands
-│   │   ├── interaction-handler.ts  # Handler de interações
-│   │   └── register-commands.ts    # Registro de commands
 │   ├── lib/
-│   │   ├── logger.ts               # Sistema de logs
-│   │   └── money.ts                # Formatação de moeda
 │   ├── services/
-│   │   ├── product.service.ts      # Lógica de produtos
-│   │   ├── order.service.ts        # Lógica de pedidos
-│   │   ├── payment.service.ts      # Pagamentos (InfinitePay)
-│   │   ├── rate-limit.service.ts   # Rate limiting
-│   │   └── audit.service.ts        # Auditoria
-│   ├── types/
-│   │   └── express.d.ts            # Type definitions
 │   └── web/
-│       └── server.ts               # Servidor Express
-└── dist/                            # Código compilado
+└── dist/
 ```
+
+## Troubleshooting
+
+- Bot não responde aos comandos:
+
+```bash
+docker compose restart app
+```
+
+- Erro P1001 (Prisma não alcança DB):
+
+```bash
+docker compose down && docker compose up -d
+docker compose ps
+```
+
+- Verificar variáveis de ambiente:
+
+```bash
+ls -la .env
+cat .env
+```
+
+## Comandos úteis
+
+```bash
+# Logs
+docker compose logs app --tail 200
+
+# Acessar DB
+docker compose exec postgres psql -U discord -d discord_stock
+```
+
+---
+
+Se quiser, posso:
+- ajustar mais detalhes do `README.md` (badges, links, exemplos de payloads), ou
+- criar um `.env.example` e um arquivo de instruções para deploy.
+
 
 ## ⚙️ Configuração
 

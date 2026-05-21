@@ -3,6 +3,7 @@ node_modules/
 
 # git ignore
 .github/
+/copilot-instructions.md
 .gitlab/
 .git/
 .gitignore
