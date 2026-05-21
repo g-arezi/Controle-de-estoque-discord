@@ -1,6 +1,11 @@
 # Node modules
 node_modules/
 
+# git ignore
+.github/
+.gitlab/
+.git/
+.gitignore
 # Build output
 
 build/
