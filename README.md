@@ -205,6 +205,16 @@ Veja o arquivo `.env.example` para referência completa.
    - Embed Links
    - Attach Files
 
+### Convidar o bot
+
+Use o link abaixo substituindo `YOUR_CLIENT_ID` pelo `DISCORD_CLIENT_ID` da sua aplicação (ou copie o valor em `.env`).
+
+Link de convite (permissões recomendadas — Send Messages, Embed Links, Attach Files):
+
+https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=51200&scope=bot%20applications.commands
+
+Você também pode gerar o link em "OAuth2 → URL Generator" no Discord Developer Portal.
+
 ### Como obter Channel/Guild ID
 
 1. Ative Developer Mode no Discord (User Settings → Advanced)
