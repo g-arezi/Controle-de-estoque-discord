@@ -174,19 +174,17 @@ async function handleMenuCommand(interaction) {
             .setMinValues(1)
             .setMaxValues(1);
         const row = new discord_js_1.ActionRowBuilder().addComponents(select);
-        // Substituir o conteúdo do embed por um resumo de status
+        // Substituir o conteúdo do embed por uma welcome page mais bonita
         const totalProducts = products.length;
         const availableProducts = products.filter((p) => p.quantity > 0).length;
         const outOfStock = totalProducts - availableProducts;
-        const typeCounts = {};
-        products.forEach((p) => {
-            const t = p.type || 'Sem tipo';
-            typeCounts[t] = (typeCounts[t] || 0) + 1;
-        });
+        const botAvatar = interaction.client?.user?.displayAvatarURL?.();
         const statusEmbed = new discord_js_1.EmbedBuilder()
-            .setTitle('🛍️ Status do Catálogo')
+            .setTitle('🛒 Seja bem-vindo')
             .setColor(EMBED_COLORS.neutral)
-            .addFields({ name: 'Total de produtos', value: String(totalProducts), inline: true }, { name: 'Disponíveis', value: String(availableProducts), inline: true }, { name: 'Fora de estoque', value: String(outOfStock), inline: true }, { name: 'Tipos de produto', value: String(Object.keys(typeCounts).length), inline: true }, { name: 'Contagem por tipo', value: Object.entries(typeCounts).map(([k, v]) => `${k}: ${v}`).join('\n') || 'Nenhum', inline: false })
+            .setDescription('**Seja bem-vindo ao sistema de vendas**\n\nUse o menu abaixo para escolher um produto.')
+            .setThumbnail(botAvatar)
+            .addFields({ name: 'Total de produtos', value: String(totalProducts), inline: true }, { name: 'Disponíveis', value: String(availableProducts), inline: true }, { name: 'Fora de estoque', value: String(outOfStock), inline: true })
             .setTimestamp();
         await interaction.editReply({
             embeds: [statusEmbed],
@@ -263,19 +261,17 @@ async function handleMenuCanalCommand(interaction) {
             .setMinValues(1)
             .setMaxValues(1);
         const row = new discord_js_1.ActionRowBuilder().addComponents(select);
-        // Substituir o conteúdo do embed por um resumo de status (canal)
+        // Substituir o conteúdo do embed por uma welcome page mais bonita (canal)
         const totalProducts = products.length;
         const availableProducts = products.filter((p) => p.quantity > 0).length;
         const outOfStock = totalProducts - availableProducts;
-        const typeCounts = {};
-        products.forEach((p) => {
-            const t = p.type || 'Sem tipo';
-            typeCounts[t] = (typeCounts[t] || 0) + 1;
-        });
+        const botAvatar = interaction.client?.user?.displayAvatarURL?.();
         const statusEmbed = new discord_js_1.EmbedBuilder()
-            .setTitle('🛍️ Status do Catálogo (Canal)')
+            .setTitle('🛍️ Menu de Produtos')
             .setColor(EMBED_COLORS.neutral)
-            .addFields({ name: 'Total de produtos', value: String(totalProducts), inline: true }, { name: 'Disponíveis', value: String(availableProducts), inline: true }, { name: 'Fora de estoque', value: String(outOfStock), inline: true }, { name: 'Tipos de produto', value: String(Object.keys(typeCounts).length), inline: true }, { name: 'Contagem por tipo', value: Object.entries(typeCounts).map(([k, v]) => `${k}: ${v}`).join('\n') || 'Nenhum', inline: false })
+            .setDescription('**seja bem vindo ao sistema de vendas**')
+            .setThumbnail(botAvatar)
+            .addFields({ name: 'Total de produtos', value: String(totalProducts), inline: true }, { name: 'Disponíveis', value: String(availableProducts), inline: true }, { name: 'Fora de estoque', value: String(outOfStock), inline: true })
             .setTimestamp();
         await interaction.editReply({
             embeds: [statusEmbed],

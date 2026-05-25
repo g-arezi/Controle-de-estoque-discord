@@ -137,25 +137,22 @@ async function handleMenuCommand(interaction: ChatInputCommandInteraction): Prom
       return;
     }
 
-    // Exibir status do catálogo: totais e contagem por tipo
+    // Exibir welcome page com status resumido (sem contagem por tipo)
     const totalProducts = products.length;
     const availableProducts = products.filter((p: any) => p.quantity > 0).length;
     const outOfStock = totalProducts - availableProducts;
-    const typeCounts: Record<string, number> = {};
-    products.forEach((p: any) => {
-      const t = p.type || 'Sem tipo';
-      typeCounts[t] = (typeCounts[t] || 0) + 1;
-    });
+
+    const botAvatar = interaction.client?.user?.displayAvatarURL?.() || undefined;
 
     const embed = new EmbedBuilder()
-      .setTitle('🛍️ Status do Catálogo')
+      .setTitle('🛒 Seja bem-vindo')
       .setColor(EMBED_COLORS.neutral)
+      .setDescription('**Seja bem-vindo ao sistema de vendas**\n\nUse o menu abaixo para escolher um produto.')
+      .setThumbnail(botAvatar)
       .addFields(
         { name: 'Total de produtos', value: String(totalProducts), inline: true },
         { name: 'Disponíveis', value: String(availableProducts), inline: true },
-        { name: 'Fora de estoque', value: String(outOfStock), inline: true },
-        { name: 'Tipos de produto', value: String(Object.keys(typeCounts).length), inline: true },
-        { name: 'Contagem por tipo', value: Object.entries(typeCounts).map(([k, v]) => `${k}: ${v}`).join('\n') || 'Nenhum', inline: false }
+        { name: 'Fora de estoque', value: String(outOfStock), inline: true }
       )
       .setTimestamp();
 
@@ -226,25 +223,22 @@ async function handleMenuCanalCommand(interaction: ChatInputCommandInteraction):
       return;
     }
 
-    // Exibir status do catálogo (por canal): totais e contagem por tipo
+    // Exibir welcome page para o canal com status resumido (sem contagem por tipo)
     const totalProducts = products.length;
     const availableProducts = products.filter((p: any) => p.quantity > 0).length;
     const outOfStock = totalProducts - availableProducts;
-    const typeCounts: Record<string, number> = {};
-    products.forEach((p: any) => {
-      const t = p.type || 'Sem tipo';
-      typeCounts[t] = (typeCounts[t] || 0) + 1;
-    });
+
+    const botAvatar = interaction.client?.user?.displayAvatarURL?.() || undefined;
 
     const embed = new EmbedBuilder()
-      .setTitle('🛍️ Status do Catálogo (Canal)')
+      .setTitle('🛒 Seja bem-vindo')
       .setColor(EMBED_COLORS.neutral)
+      .setDescription('**Seja bem-vindo ao sistema de vendas**\n\nUse o menu abaixo para escolher um produto.')
+      .setThumbnail(botAvatar)
       .addFields(
         { name: 'Total de produtos', value: String(totalProducts), inline: true },
         { name: 'Disponíveis', value: String(availableProducts), inline: true },
-        { name: 'Fora de estoque', value: String(outOfStock), inline: true },
-        { name: 'Tipos de produto', value: String(Object.keys(typeCounts).length), inline: true },
-        { name: 'Contagem por tipo', value: Object.entries(typeCounts).map(([k, v]) => `${k}: ${v}`).join('\n') || 'Nenhum', inline: false }
+        { name: 'Fora de estoque', value: String(outOfStock), inline: true }
       )
       .setTimestamp();
 
