@@ -58,6 +58,9 @@ async function handleInteraction(interaction) {
         else if (interaction.isButton()) {
             await handleButtonInteraction(interaction);
         }
+        else if (interaction.isStringSelectMenu && interaction.isStringSelectMenu()) {
+            await handleSelectInteraction(interaction);
+        }
     }
     catch (error) {
         logger_1.logger.error('Erro ao processar interação', error);
@@ -65,6 +68,39 @@ async function handleInteraction(interaction) {
             content: '❌ Ocorreu um erro ao processar sua solicitação.',
             ephemeral: true,
         });
+    }
+}
+async function handleSelectInteraction(interaction) {
+    const customId = interaction.customId;
+    if (customId === 'select_product') {
+        const values = interaction.values;
+        const productId = values && values.length ? values[0] : null;
+        if (!productId) {
+            await interaction.reply({ content: '❌ Produto inválido.', ephemeral: true });
+            return;
+        }
+        const product = await productService.getProduct(productId);
+        if (!product) {
+            await interaction.reply({ content: '❌ Produto não encontrado.', ephemeral: true });
+            return;
+        }
+        const embed = new discord_js_1.EmbedBuilder()
+            .setTitle(product.name)
+            .setColor(EMBED_COLORS.info)
+            .setDescription(product.description || 'Sem descrição')
+            .addFields({ name: '💰 Preço', value: (0, money_1.formatMoney)(product.price), inline: true }, { name: '📦 Estoque', value: product.quantity.toString(), inline: true }, { name: '🏷️ Categoria', value: product.category, inline: true }, { name: '📊 Tipo', value: product.type, inline: true })
+            .setTimestamp();
+        if (product.imageUrl) {
+            embed.setImage(product.imageUrl);
+        }
+        const buttons = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
+            .setCustomId(`buy_${product.id}`)
+            .setLabel('Comprar Agora')
+            .setStyle(discord_js_1.ButtonStyle.Success), new discord_js_1.ButtonBuilder()
+            .setCustomId('back_to_menu')
+            .setLabel('Voltar ao Menu')
+            .setStyle(discord_js_1.ButtonStyle.Secondary));
+        await interaction.reply({ embeds: [embed], components: [buttons], ephemeral: true });
     }
 }
 async function handleSlashCommand(interaction) {
@@ -125,18 +161,36 @@ async function handleMenuCommand(interaction) {
             });
             embeds.push(embed);
         }
-        // Buttons para produtos
-        const rows = [];
-        for (let i = 0; i < products.length; i += 5) {
-            const pageButtons = products.slice(i, i + 5).map((product) => new discord_js_1.ButtonBuilder()
-                .setCustomId(`product_detail_${product.id}`)
-                .setLabel(product.name.substring(0, 80))
-                .setStyle(discord_js_1.ButtonStyle.Primary));
-            rows.push(new discord_js_1.ActionRowBuilder().addComponents(pageButtons));
-        }
+        // Select menu para escolher produtos (label = nome, description = preço | estoque)
+        const selectOptions = products.map((product) => ({
+            label: product.name.substring(0, 100),
+            description: `${(0, money_1.formatMoney)(product.price)} | Estoque: ${product.quantity}`.substring(0, 100),
+            value: product.id,
+        }));
+        const select = new discord_js_1.StringSelectMenuBuilder()
+            .setCustomId('select_product')
+            .setPlaceholder('Selecione um produto...')
+            .addOptions(selectOptions)
+            .setMinValues(1)
+            .setMaxValues(1);
+        const row = new discord_js_1.ActionRowBuilder().addComponents(select);
+        // Substituir o conteúdo do embed por um resumo de status
+        const totalProducts = products.length;
+        const availableProducts = products.filter((p) => p.quantity > 0).length;
+        const outOfStock = totalProducts - availableProducts;
+        const typeCounts = {};
+        products.forEach((p) => {
+            const t = p.type || 'Sem tipo';
+            typeCounts[t] = (typeCounts[t] || 0) + 1;
+        });
+        const statusEmbed = new discord_js_1.EmbedBuilder()
+            .setTitle('🛍️ Status do Catálogo')
+            .setColor(EMBED_COLORS.neutral)
+            .addFields({ name: 'Total de produtos', value: String(totalProducts), inline: true }, { name: 'Disponíveis', value: String(availableProducts), inline: true }, { name: 'Fora de estoque', value: String(outOfStock), inline: true }, { name: 'Tipos de produto', value: String(Object.keys(typeCounts).length), inline: true }, { name: 'Contagem por tipo', value: Object.entries(typeCounts).map(([k, v]) => `${k}: ${v}`).join('\n') || 'Nenhum', inline: false })
+            .setTimestamp();
         await interaction.editReply({
-            embeds,
-            components: rows,
+            embeds: [statusEmbed],
+            components: [row],
         });
     }
     catch (error) {
@@ -196,18 +250,36 @@ async function handleMenuCanalCommand(interaction) {
             });
             embeds.push(embed);
         }
-        // Buttons para produtos
-        const rows = [];
-        for (let i = 0; i < products.length; i += 5) {
-            const pageButtons = products.slice(i, i + 5).map((product) => new discord_js_1.ButtonBuilder()
-                .setCustomId(`product_detail_${product.id}`)
-                .setLabel(product.name.substring(0, 80))
-                .setStyle(discord_js_1.ButtonStyle.Primary));
-            rows.push(new discord_js_1.ActionRowBuilder().addComponents(pageButtons));
-        }
+        // Select menu para escolher produtos (label = nome, description = preço | estoque)
+        const selectOptions = products.map((product) => ({
+            label: product.name.substring(0, 100),
+            description: `${(0, money_1.formatMoney)(product.price)} | Estoque: ${product.quantity}`.substring(0, 100),
+            value: product.id,
+        }));
+        const select = new discord_js_1.StringSelectMenuBuilder()
+            .setCustomId('select_product')
+            .setPlaceholder('Selecione um produto...')
+            .addOptions(selectOptions)
+            .setMinValues(1)
+            .setMaxValues(1);
+        const row = new discord_js_1.ActionRowBuilder().addComponents(select);
+        // Substituir o conteúdo do embed por um resumo de status (canal)
+        const totalProducts = products.length;
+        const availableProducts = products.filter((p) => p.quantity > 0).length;
+        const outOfStock = totalProducts - availableProducts;
+        const typeCounts = {};
+        products.forEach((p) => {
+            const t = p.type || 'Sem tipo';
+            typeCounts[t] = (typeCounts[t] || 0) + 1;
+        });
+        const statusEmbed = new discord_js_1.EmbedBuilder()
+            .setTitle('🛍️ Status do Catálogo (Canal)')
+            .setColor(EMBED_COLORS.neutral)
+            .addFields({ name: 'Total de produtos', value: String(totalProducts), inline: true }, { name: 'Disponíveis', value: String(availableProducts), inline: true }, { name: 'Fora de estoque', value: String(outOfStock), inline: true }, { name: 'Tipos de produto', value: String(Object.keys(typeCounts).length), inline: true }, { name: 'Contagem por tipo', value: Object.entries(typeCounts).map(([k, v]) => `${k}: ${v}`).join('\n') || 'Nenhum', inline: false })
+            .setTimestamp();
         await interaction.editReply({
-            embeds,
-            components: rows,
+            embeds: [statusEmbed],
+            components: [row],
         });
     }
     catch (error) {
@@ -573,26 +645,21 @@ async function handleButtonInteraction(interaction) {
         });
     }
     else if (customId === 'back_to_menu') {
-        // Re-enviar o menu
+        // Recriar select menu com os produtos
         const products = await productService.listProducts(false);
-        const rows = [];
-        for (let i = 0; i < products.length; i += 5) {
-            const pageButtons = products.slice(i, i + 5).map((product) => new discord_js_1.ButtonBuilder()
-                .setCustomId(`product_detail_${product.id}`)
-                .setLabel(product.name.substring(0, 80))
-                .setStyle(discord_js_1.ButtonStyle.Primary));
-            rows.push(new discord_js_1.ActionRowBuilder().addComponents(pageButtons));
-        }
-        await interaction.reply({
-            embeds: [
-                new discord_js_1.EmbedBuilder()
-                    .setTitle('🛍️ Menu de Produtos')
-                    .setColor(EMBED_COLORS.neutral)
-                    .setTimestamp(),
-            ],
-            components: rows,
-            ephemeral: true,
-        });
+        const selectOptions = products.map((product) => ({
+            label: product.name.substring(0, 100),
+            description: `${(0, money_1.formatMoney)(product.price)} | Estoque: ${product.quantity}`.substring(0, 100),
+            value: product.id,
+        }));
+        const select = new discord_js_1.StringSelectMenuBuilder()
+            .setCustomId('select_product')
+            .setPlaceholder('Selecione um produto...')
+            .addOptions(selectOptions)
+            .setMinValues(1)
+            .setMaxValues(1);
+        const row = new discord_js_1.ActionRowBuilder().addComponents(select);
+        await interaction.reply({ embeds: [], components: [row], ephemeral: true });
     }
     else if (customId.startsWith('ticket_buy_')) {
         const orderId = customId.replace('ticket_buy_', '');

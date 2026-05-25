@@ -4,6 +4,7 @@ import {
   ButtonInteraction,
   EmbedBuilder,
   ActionRowBuilder,
+  StringSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
   ChannelType,
@@ -31,6 +32,8 @@ export async function handleInteraction(interaction: any): Promise<void> {
       await handleSlashCommand(interaction);
     } else if (interaction.isButton()) {
       await handleButtonInteraction(interaction);
+    } else if (interaction.isStringSelectMenu && interaction.isStringSelectMenu()) {
+      await handleSelectInteraction(interaction as any);
     }
   } catch (error) {
     logger.error('Erro ao processar interação', error);
@@ -38,6 +41,54 @@ export async function handleInteraction(interaction: any): Promise<void> {
       content: '❌ Ocorreu um erro ao processar sua solicitação.',
       ephemeral: true,
     });
+  }
+}
+
+async function handleSelectInteraction(interaction: any): Promise<void> {
+  const customId = interaction.customId;
+  if (customId === 'select_product') {
+    const values = interaction.values;
+    const productId = values && values.length ? values[0] : null;
+
+    if (!productId) {
+      await interaction.reply({ content: '❌ Produto inválido.', ephemeral: true });
+      return;
+    }
+
+    const product = await productService.getProduct(productId);
+    if (!product) {
+      await interaction.reply({ content: '❌ Produto não encontrado.', ephemeral: true });
+      return;
+    }
+
+    const embed = new EmbedBuilder()
+      .setTitle(product.name)
+      .setColor(EMBED_COLORS.info)
+      .setDescription(product.description || 'Sem descrição')
+      .addFields(
+        { name: '💰 Preço', value: formatMoney(product.price), inline: true },
+        { name: '📦 Estoque', value: product.quantity.toString(), inline: true },
+        { name: '🏷️ Categoria', value: product.category, inline: true },
+        { name: '📊 Tipo', value: product.type, inline: true }
+      )
+      .setTimestamp();
+
+    if (product.imageUrl) {
+      embed.setImage(product.imageUrl);
+    }
+
+    const buttons = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`buy_${product.id}`)
+        .setLabel('Comprar Agora')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('back_to_menu')
+        .setLabel('Voltar ao Menu')
+        .setStyle(ButtonStyle.Secondary)
+    );
+
+    await interaction.reply({ embeds: [embed], components: [buttons], ephemeral: true });
   }
 }
 
@@ -86,44 +137,49 @@ async function handleMenuCommand(interaction: ChatInputCommandInteraction): Prom
       return;
     }
 
-    const embeds: EmbedBuilder[] = [];
-    const maxItemsPerEmbed = 5;
+    // Exibir status do catálogo: totais e contagem por tipo
+    const totalProducts = products.length;
+    const availableProducts = products.filter((p: any) => p.quantity > 0).length;
+    const outOfStock = totalProducts - availableProducts;
+    const typeCounts: Record<string, number> = {};
+    products.forEach((p: any) => {
+      const t = p.type || 'Sem tipo';
+      typeCounts[t] = (typeCounts[t] || 0) + 1;
+    });
 
-    for (let i = 0; i < products.length; i += maxItemsPerEmbed) {
-      const pageProducts = products.slice(i, i + maxItemsPerEmbed);
-      const embed = new EmbedBuilder()
-        .setTitle('🛍️ Menu de Produtos')
-          .setColor(EMBED_COLORS.neutral)
-        .setDescription(`Página ${Math.floor(i / maxItemsPerEmbed) + 1}`)
-        .setTimestamp();
+    const embed = new EmbedBuilder()
+      .setTitle('🛍️ Status do Catálogo')
+      .setColor(EMBED_COLORS.neutral)
+      .addFields(
+        { name: 'Total de produtos', value: String(totalProducts), inline: true },
+        { name: 'Disponíveis', value: String(availableProducts), inline: true },
+        { name: 'Fora de estoque', value: String(outOfStock), inline: true },
+        { name: 'Tipos de produto', value: String(Object.keys(typeCounts).length), inline: true },
+        { name: 'Contagem por tipo', value: Object.entries(typeCounts).map(([k, v]) => `${k}: ${v}`).join('\n') || 'Nenhum', inline: false }
+      )
+      .setTimestamp();
 
-      pageProducts.forEach((product: any) => {
-        embed.addFields({
-          name: `${product.name} (${product.id})`,
-          value: `💰 ${formatMoney(product.price)} | 📦 ${product.quantity} em estoque`,
-          inline: false,
-        });
-      });
+    const embeds: EmbedBuilder[] = [embed];
 
-      embeds.push(embed);
-    }
+    // Select menu para escolher produtos (label = nome, description = preço | estoque)
+    const selectOptions = products.map((product: any) => ({
+      label: product.name.substring(0, 100),
+      description: `${formatMoney(product.price)} | Estoque: ${product.quantity}`.substring(0, 100),
+      value: product.id,
+    }));
 
-    // Buttons para produtos
-    const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-    for (let i = 0; i < products.length; i += 5) {
-      const pageButtons = products.slice(i, i + 5).map((product: any) =>
-        new ButtonBuilder()
-          .setCustomId(`product_detail_${product.id}`)
-          .setLabel(product.name.substring(0, 80))
-          .setStyle(ButtonStyle.Primary)
-      );
+    const select = new StringSelectMenuBuilder()
+      .setCustomId('select_product')
+      .setPlaceholder('Selecione um produto...')
+      .addOptions(selectOptions)
+      .setMinValues(1)
+      .setMaxValues(1);
 
-      rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(pageButtons));
-    }
+    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select as any);
 
     await interaction.editReply({
       embeds,
-      components: rows,
+      components: [row],
     });
   } catch (error) {
     logger.error('Erro ao mostrar menu', error);
@@ -170,44 +226,49 @@ async function handleMenuCanalCommand(interaction: ChatInputCommandInteraction):
       return;
     }
 
-    const embeds: EmbedBuilder[] = [];
-    const maxItemsPerEmbed = 5;
+    // Exibir status do catálogo (por canal): totais e contagem por tipo
+    const totalProducts = products.length;
+    const availableProducts = products.filter((p: any) => p.quantity > 0).length;
+    const outOfStock = totalProducts - availableProducts;
+    const typeCounts: Record<string, number> = {};
+    products.forEach((p: any) => {
+      const t = p.type || 'Sem tipo';
+      typeCounts[t] = (typeCounts[t] || 0) + 1;
+    });
 
-    for (let i = 0; i < products.length; i += maxItemsPerEmbed) {
-      const pageProducts = products.slice(i, i + maxItemsPerEmbed);
-      const embed = new EmbedBuilder()
-        .setTitle('🛍️ Menu de Produtos')
-          .setColor(EMBED_COLORS.neutral)
-        .setDescription(`Página ${Math.floor(i / maxItemsPerEmbed) + 1}`)
-        .setTimestamp();
+    const embed = new EmbedBuilder()
+      .setTitle('🛍️ Status do Catálogo (Canal)')
+      .setColor(EMBED_COLORS.neutral)
+      .addFields(
+        { name: 'Total de produtos', value: String(totalProducts), inline: true },
+        { name: 'Disponíveis', value: String(availableProducts), inline: true },
+        { name: 'Fora de estoque', value: String(outOfStock), inline: true },
+        { name: 'Tipos de produto', value: String(Object.keys(typeCounts).length), inline: true },
+        { name: 'Contagem por tipo', value: Object.entries(typeCounts).map(([k, v]) => `${k}: ${v}`).join('\n') || 'Nenhum', inline: false }
+      )
+      .setTimestamp();
 
-      pageProducts.forEach((product: any) => {
-        embed.addFields({
-          name: `${product.name} (${product.id})`,
-          value: `💰 ${formatMoney(product.price)} | 📦 ${product.quantity} em estoque | ${product.type}`,
-          inline: false,
-        });
-      });
+    const embeds: EmbedBuilder[] = [embed];
 
-      embeds.push(embed);
-    }
+    // Select menu para escolher produtos (label = nome, description = preço | estoque)
+    const selectOptions = products.map((product: any) => ({
+      label: product.name.substring(0, 100),
+      description: `${formatMoney(product.price)} | Estoque: ${product.quantity}`.substring(0, 100),
+      value: product.id,
+    }));
 
-    // Buttons para produtos
-    const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-    for (let i = 0; i < products.length; i += 5) {
-      const pageButtons = products.slice(i, i + 5).map((product: any) =>
-        new ButtonBuilder()
-          .setCustomId(`product_detail_${product.id}`)
-          .setLabel(product.name.substring(0, 80))
-          .setStyle(ButtonStyle.Primary)
-      );
+    const select = new StringSelectMenuBuilder()
+      .setCustomId('select_product')
+      .setPlaceholder('Selecione um produto...')
+      .addOptions(selectOptions)
+      .setMinValues(1)
+      .setMaxValues(1);
 
-      rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(pageButtons));
-    }
+    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select as any);
 
     await interaction.editReply({
       embeds,
-      components: rows,
+      components: [row],
     });
   } catch (error) {
     logger.error('Erro ao mostrar menu do canal', error);
@@ -658,29 +719,23 @@ async function handleButtonInteraction(interaction: ButtonInteraction): Promise<
   } else if (customId === 'back_to_menu') {
     // Re-enviar o menu
     const products = await productService.listProducts(false);
-    const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+    // Recriar select menu com os produtos
+    const selectOptions = products.map((product: any) => ({
+      label: product.name.substring(0, 100),
+      description: `${formatMoney(product.price)} | Estoque: ${product.quantity}`.substring(0, 100),
+      value: product.id,
+    }));
 
-    for (let i = 0; i < products.length; i += 5) {
-      const pageButtons = products.slice(i, i + 5).map((product: any) =>
-        new ButtonBuilder()
-          .setCustomId(`product_detail_${product.id}`)
-          .setLabel(product.name.substring(0, 80))
-          .setStyle(ButtonStyle.Primary)
-      );
+    const select = new StringSelectMenuBuilder()
+      .setCustomId('select_product')
+      .setPlaceholder('Selecione um produto...')
+      .addOptions(selectOptions)
+      .setMinValues(1)
+      .setMaxValues(1);
 
-      rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(pageButtons));
-    }
+    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select as any);
 
-    await interaction.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setTitle('🛍️ Menu de Produtos')
-            .setColor(EMBED_COLORS.neutral)
-            .setTimestamp(),
-        ],
-      components: rows,
-      ephemeral: true,
-    });
+    await interaction.reply({ embeds: [], components: [row] });
   } else if (customId.startsWith('ticket_buy_')) {
     const orderId = customId.replace('ticket_buy_', '');
     const order = await orderService.getOrder(orderId);
