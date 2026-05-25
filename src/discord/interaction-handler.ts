@@ -179,7 +179,7 @@ async function handleMenuCommand(interaction: ChatInputCommandInteraction): Prom
     const availableProducts = products.filter((p: any) => p.quantity > 0).length;
     const outOfStock = totalProducts - availableProducts;
 
-    const botAvatar = interaction.client?.user?.displayAvatarURL?.() || undefined;
+    const botAvatar = interaction.client?.user?.displayAvatarURL?.() ?? null;
 
     const embed = new EmbedBuilder()
       .setTitle('🛒 Seja bem-vindo')
@@ -265,7 +265,7 @@ async function handleMenuCanalCommand(interaction: ChatInputCommandInteraction):
     const availableProducts = products.filter((p: any) => p.quantity > 0).length;
     const outOfStock = totalProducts - availableProducts;
 
-    const botAvatar = interaction.client?.user?.displayAvatarURL?.() || undefined;
+    const botAvatar = interaction.client?.user?.displayAvatarURL?.() ?? null;
 
     const embed = new EmbedBuilder()
       .setTitle('🛒 Seja bem-vindo')

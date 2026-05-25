@@ -105,34 +105,35 @@ async function handleSelectInteraction(interaction) {
             .setStyle(discord_js_1.ButtonStyle.Secondary));
         await interaction.reply({ embeds: [embed], components: [buttons], ephemeral: true });
     }
-    }
-    async function handleModalSubmit(interaction) {
-        const customId = interaction.customId;
-        if (customId.startsWith('confirm_cancel_order_')) {
-            const orderId = customId.replace('confirm_cancel_order_', '');
-            if (!interaction.memberPermissions || !interaction.memberPermissions.has('Administrator')) {
-                await interaction.reply({ content: '❌ Apenas administradores podem confirmar este cancelamento.', ephemeral: true });
-                return;
+}
+async function handleModalSubmit(interaction) {
+    const customId = interaction.customId;
+    if (customId.startsWith('confirm_cancel_order_')) {
+        const orderId = customId.replace('confirm_cancel_order_', '');
+        // Only admins can confirm cancellation
+        if (!interaction.memberPermissions || !interaction.memberPermissions.has('Administrator')) {
+            await interaction.reply({ content: '❌ Apenas administradores podem confirmar este cancelamento.', ephemeral: true });
+            return;
+        }
+        const confirmation = (interaction.fields.getTextInputValue('confirm_text') || '').trim().toUpperCase();
+        if (confirmation !== 'CONFIRMAR') {
+            await interaction.reply({ content: 'Ação cancelada: texto de confirmação incorreto.', ephemeral: true });
+            return;
+        }
+        try {
+            const result = await ticketService.cancelDeliveryTicket(orderId, `${interaction.user.username}`);
+            if (result) {
+                await interaction.reply({ content: '✅ Pedido cancelado e ticket fechado.', ephemeral: true });
             }
-            const confirmation = (interaction.fields.getTextInputValue('confirm_text') || '').trim().toUpperCase();
-            if (confirmation !== 'CONFIRMAR') {
-                await interaction.reply({ content: 'Ação cancelada: texto de confirmação incorreto.', ephemeral: true });
-                return;
-            }
-            try {
-                const result = await ticketService.cancelDeliveryTicket(orderId, `${interaction.user.username}`);
-                if (result) {
-                    await interaction.reply({ content: '✅ Pedido cancelado e ticket fechado.', ephemeral: true });
-                }
-                else {
-                    await interaction.reply({ content: '⚠️ Pedido cancelado, mas houve problemas ao fechar o ticket.', ephemeral: true });
-                }
-            }
-            catch (err) {
-                logger_1.logger.error('Erro ao processar confirmação de cancelamento', err);
-                await interaction.reply({ content: '❌ Falha ao cancelar o pedido.', ephemeral: true });
+            else {
+                await interaction.reply({ content: '⚠️ Pedido cancelado, mas houve problemas ao fechar o ticket.', ephemeral: true });
             }
         }
+        catch (err) {
+            logger_1.logger.error('Erro ao processar confirmação de cancelamento', err);
+            await interaction.reply({ content: '❌ Falha ao cancelar o pedido.', ephemeral: true });
+        }
+    }
 }
 async function handleSlashCommand(interaction) {
     const commandName = interaction.commandName;
@@ -174,24 +175,19 @@ async function handleMenuCommand(interaction) {
             });
             return;
         }
-        const embeds = [];
-        const maxItemsPerEmbed = 5;
-        for (let i = 0; i < products.length; i += maxItemsPerEmbed) {
-            const pageProducts = products.slice(i, i + maxItemsPerEmbed);
-            const embed = new discord_js_1.EmbedBuilder()
-                .setTitle('🛍️ Menu de Produtos')
-                .setColor(EMBED_COLORS.neutral)
-                .setDescription(`Página ${Math.floor(i / maxItemsPerEmbed) + 1}`)
-                .setTimestamp();
-            pageProducts.forEach((product) => {
-                embed.addFields({
-                    name: `${product.name} (${product.id})`,
-                    value: `💰 ${(0, money_1.formatMoney)(product.price)} | 📦 ${product.quantity} em estoque`,
-                    inline: false,
-                });
-            });
-            embeds.push(embed);
-        }
+        // Exibir welcome page com status resumido (sem contagem por tipo)
+        const totalProducts = products.length;
+        const availableProducts = products.filter((p) => p.quantity > 0).length;
+        const outOfStock = totalProducts - availableProducts;
+        const botAvatar = interaction.client?.user?.displayAvatarURL?.() ?? null;
+        const embed = new discord_js_1.EmbedBuilder()
+            .setTitle('🛒 Seja bem-vindo')
+            .setColor(EMBED_COLORS.neutral)
+            .setDescription('**Seja bem-vindo ao sistema de vendas**\n\nUse o menu abaixo para escolher um produto.')
+            .setThumbnail(botAvatar)
+            .addFields({ name: 'Total de produtos', value: String(totalProducts), inline: true }, { name: 'Disponíveis', value: String(availableProducts), inline: true }, { name: 'Fora de estoque', value: String(outOfStock), inline: true })
+            .setTimestamp();
+        const embeds = [embed];
         // Select menu para escolher produtos (label = nome, description = preço | estoque)
         const selectOptions = products.map((product) => ({
             label: product.name.substring(0, 100),
@@ -205,20 +201,8 @@ async function handleMenuCommand(interaction) {
             .setMinValues(1)
             .setMaxValues(1);
         const row = new discord_js_1.ActionRowBuilder().addComponents(select);
-        // Substituir o conteúdo do embed por uma welcome page mais bonita
-        const totalProducts = products.length;
-        const availableProducts = products.filter((p) => p.quantity > 0).length;
-        const outOfStock = totalProducts - availableProducts;
-        const botAvatar = interaction.client?.user?.displayAvatarURL?.();
-        const statusEmbed = new discord_js_1.EmbedBuilder()
-            .setTitle('🛒 Seja bem-vindo')
-            .setColor(EMBED_COLORS.neutral)
-            .setDescription('**Seja bem-vindo ao sistema de vendas**\n\nUse o menu abaixo para escolher um produto.')
-            .setThumbnail(botAvatar)
-            .addFields({ name: 'Total de produtos', value: String(totalProducts), inline: true }, { name: 'Disponíveis', value: String(availableProducts), inline: true }, { name: 'Fora de estoque', value: String(outOfStock), inline: true })
-            .setTimestamp();
         await interaction.editReply({
-            embeds: [statusEmbed],
+            embeds,
             components: [row],
         });
     }
@@ -261,24 +245,19 @@ async function handleMenuCanalCommand(interaction) {
             });
             return;
         }
-        const embeds = [];
-        const maxItemsPerEmbed = 5;
-        for (let i = 0; i < products.length; i += maxItemsPerEmbed) {
-            const pageProducts = products.slice(i, i + maxItemsPerEmbed);
-            const embed = new discord_js_1.EmbedBuilder()
-                .setTitle('🛍️ Menu de Produtos')
-                .setColor(EMBED_COLORS.neutral)
-                .setDescription(`Página ${Math.floor(i / maxItemsPerEmbed) + 1}`)
-                .setTimestamp();
-            pageProducts.forEach((product) => {
-                embed.addFields({
-                    name: `${product.name} (${product.id})`,
-                    value: `💰 ${(0, money_1.formatMoney)(product.price)} | 📦 ${product.quantity} em estoque | ${product.type}`,
-                    inline: false,
-                });
-            });
-            embeds.push(embed);
-        }
+        // Exibir welcome page para o canal com status resumido (sem contagem por tipo)
+        const totalProducts = products.length;
+        const availableProducts = products.filter((p) => p.quantity > 0).length;
+        const outOfStock = totalProducts - availableProducts;
+        const botAvatar = interaction.client?.user?.displayAvatarURL?.() ?? null;
+        const embed = new discord_js_1.EmbedBuilder()
+            .setTitle('🛒 Seja bem-vindo')
+            .setColor(EMBED_COLORS.neutral)
+            .setDescription('**Seja bem-vindo ao sistema de vendas**\n\nUse o menu abaixo para escolher um produto.')
+            .setThumbnail(botAvatar)
+            .addFields({ name: 'Total de produtos', value: String(totalProducts), inline: true }, { name: 'Disponíveis', value: String(availableProducts), inline: true }, { name: 'Fora de estoque', value: String(outOfStock), inline: true })
+            .setTimestamp();
+        const embeds = [embed];
         // Select menu para escolher produtos (label = nome, description = preço | estoque)
         const selectOptions = products.map((product) => ({
             label: product.name.substring(0, 100),
@@ -292,20 +271,8 @@ async function handleMenuCanalCommand(interaction) {
             .setMinValues(1)
             .setMaxValues(1);
         const row = new discord_js_1.ActionRowBuilder().addComponents(select);
-        // Substituir o conteúdo do embed por uma welcome page mais bonita (canal)
-        const totalProducts = products.length;
-        const availableProducts = products.filter((p) => p.quantity > 0).length;
-        const outOfStock = totalProducts - availableProducts;
-        const botAvatar = interaction.client?.user?.displayAvatarURL?.();
-        const statusEmbed = new discord_js_1.EmbedBuilder()
-            .setTitle('🛍️ Menu de Produtos')
-            .setColor(EMBED_COLORS.neutral)
-            .setDescription('**seja bem vindo ao sistema de vendas**')
-            .setThumbnail(botAvatar)
-            .addFields({ name: 'Total de produtos', value: String(totalProducts), inline: true }, { name: 'Disponíveis', value: String(availableProducts), inline: true }, { name: 'Fora de estoque', value: String(outOfStock), inline: true })
-            .setTimestamp();
         await interaction.editReply({
-            embeds: [statusEmbed],
+            embeds,
             components: [row],
         });
     }
@@ -672,8 +639,9 @@ async function handleButtonInteraction(interaction) {
         });
     }
     else if (customId === 'back_to_menu') {
-        // Recriar select menu com os produtos
+        // Re-enviar o menu
         const products = await productService.listProducts(false);
+        // Recriar select menu com os produtos
         const selectOptions = products.map((product) => ({
             label: product.name.substring(0, 100),
             description: `${(0, money_1.formatMoney)(product.price)} | Estoque: ${product.quantity}`.substring(0, 100),
@@ -686,7 +654,7 @@ async function handleButtonInteraction(interaction) {
             .setMinValues(1)
             .setMaxValues(1);
         const row = new discord_js_1.ActionRowBuilder().addComponents(select);
-        await interaction.reply({ embeds: [], components: [row], ephemeral: true });
+        await interaction.reply({ embeds: [], components: [row] });
     }
     else if (customId.startsWith('ticket_buy_')) {
         const orderId = customId.replace('ticket_buy_', '');
@@ -728,52 +696,53 @@ async function handleButtonInteraction(interaction) {
             ],
             ephemeral: true,
         });
+    }
+    else if (customId.startsWith('admin_close_ticket_')) {
+        const orderId = customId.replace('admin_close_ticket_', '');
+        if (!interaction.memberPermissions || !interaction.memberPermissions.has('Administrator')) {
+            await interaction.reply({ content: '❌ Apenas administradores podem usar este botão.', ephemeral: true });
+            return;
         }
-        else if (customId.startsWith('admin_close_ticket_')) {
-            const orderId = customId.replace('admin_close_ticket_', '');
-            if (!interaction.memberPermissions || !interaction.memberPermissions.has('Administrator')) {
-                await interaction.reply({ content: '❌ Apenas administradores podem usar este botão.', ephemeral: true });
-                return;
+        try {
+            const closed = await ticketService.closeDeliveryTicket(orderId, `${interaction.user.username}`);
+            if (closed) {
+                await interaction.reply({ content: '🔒 Ticket fechado e canal arquivado (somente leitura).', ephemeral: true });
             }
-            try {
-                        const closed = await ticketService.closeDeliveryTicket(orderId, `${interaction.user.username}`);
-                        if (closed) {
-                            await interaction.reply({ content: '🔒 Ticket fechado e canal arquivado (somente leitura).', ephemeral: true });
-                        }
-                        else {
-                            await interaction.reply({ content: '⚠️ Ticket marcado como fechado, porém houve problemas ao arquivar o canal.', ephemeral: true });
-                        }
-            }
-            catch (err) {
-                logger_1.logger.error('Erro ao fechar ticket via botão admin', err);
-                await interaction.reply({ content: '❌ Falha ao fechar o ticket.', ephemeral: true });
+            else {
+                await interaction.reply({ content: '⚠️ Ticket marcado como fechado, porém houve problemas ao arquivar o canal.', ephemeral: true });
             }
         }
-        else if (customId.startsWith('admin_cancel_order_')) {
-            const orderId = customId.replace('admin_cancel_order_', '');
-            if (!interaction.memberPermissions || !interaction.memberPermissions.has('Administrator')) {
-                await interaction.reply({ content: '❌ Apenas administradores podem usar este botão.', ephemeral: true });
-                return;
-            }
-            try {
-                const modal = new discord_js_1.ModalBuilder()
-                    .setCustomId(`confirm_cancel_order_${orderId}`)
-                    .setTitle('Confirmar cancelamento');
-                const input = new discord_js_1.TextInputBuilder()
-                    .setCustomId('confirm_text')
-                    .setLabel('Digite CONFIRMAR para cancelar o pedido')
-                    .setStyle(discord_js_1.TextInputStyle.Short)
-                    .setPlaceholder('CONFIRMAR')
-                    .setRequired(true);
-                const row = new discord_js_1.ActionRowBuilder().addComponents(input);
-                modal.addComponents(row);
-                await interaction.showModal(modal);
-            }
-            catch (err) {
-                logger_1.logger.error('Erro ao abrir modal de confirmação', err);
-                await interaction.reply({ content: '❌ Não foi possível abrir o modal de confirmação.', ephemeral: true });
-            }
+        catch (err) {
+            logger_1.logger.error('Erro ao fechar ticket via botão admin', err);
+            await interaction.reply({ content: '❌ Falha ao fechar o ticket.', ephemeral: true });
         }
+    }
+    else if (customId.startsWith('admin_cancel_order_')) {
+        const orderId = customId.replace('admin_cancel_order_', '');
+        if (!interaction.memberPermissions || !interaction.memberPermissions.has('Administrator')) {
+            await interaction.reply({ content: '❌ Apenas administradores podem usar este botão.', ephemeral: true });
+            return;
+        }
+        // Mostrar modal de confirmação
+        try {
+            const modal = new discord_js_1.ModalBuilder()
+                .setCustomId(`confirm_cancel_order_${orderId}`)
+                .setTitle('Confirmar cancelamento');
+            const input = new discord_js_1.TextInputBuilder()
+                .setCustomId('confirm_text')
+                .setLabel('Digite CONFIRMAR para cancelar o pedido')
+                .setStyle(discord_js_1.TextInputStyle.Short)
+                .setPlaceholder('CONFIRMAR')
+                .setRequired(true);
+            const row = new discord_js_1.ActionRowBuilder().addComponents(input);
+            modal.addComponents(row);
+            await interaction.showModal(modal);
+        }
+        catch (err) {
+            logger_1.logger.error('Erro ao abrir modal de confirmação', err);
+            await interaction.reply({ content: '❌ Não foi possível abrir o modal de confirmação.', ephemeral: true });
+        }
+    }
 }
 async function handleTypesCommand(interaction) {
     // Verificar permissões

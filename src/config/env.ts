@@ -5,6 +5,7 @@ dotenv.config();
 const requiredEnvVars = [
   'DISCORD_TOKEN',
   'DISCORD_CLIENT_ID',
+  'DISCORD_GUILD_ID',
   'DATABASE_URL',
 ];
 
@@ -29,7 +30,7 @@ export const config = {
     token: process.env.DISCORD_TOKEN!,
     clientId: process.env.DISCORD_CLIENT_ID!,
     estoqueChannelId: process.env.ESTOQUE_CHANNEL_ID!,
-    guildId: process.env.DISCORD_GUILD_ID,
+    guildId: process.env.DISCORD_GUILD_ID!,
   },
   database: {
     url: process.env.DATABASE_URL!,

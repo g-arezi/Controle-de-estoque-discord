@@ -64,7 +64,8 @@ const estoqueCommand = new SlashCommandBuilder()
             { name: 'AUXILIARES', value: 'AUXILIARES' },
             { name: 'REGEDIT', value: 'REGEDIT' },
             { name: 'DIGITAL', value: 'DIGITAL' },
-            { name: 'PHYSICAL', value: 'PHYSICAL' }
+            { name: 'PHYSICAL', value: 'PHYSICAL' },
+            { name: 'OUTROS', value: 'OUTROS' }
           )
       )
       .addChannelOption((option) =>
@@ -113,7 +114,8 @@ const estoqueCommand = new SlashCommandBuilder()
             { name: 'AUXILIARES', value: 'AUXILIARES' },
             { name: 'REGEDIT', value: 'REGEDIT' },
             { name: 'DIGITAL', value: 'DIGITAL' },
-            { name: 'PHYSICAL', value: 'PHYSICAL' }
+            { name: 'PHYSICAL', value: 'PHYSICAL' },
+            { name: 'OUTROS', value: 'OUTROS' }
           )
       )
       .addChannelOption((option) =>

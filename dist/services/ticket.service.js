@@ -33,9 +33,9 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ensureDeliveryTicket = ensureDeliveryTicket;
-exports.cancelDeliveryTicket = cancelDeliveryTicket;
 exports.closeDeliveryTicket = closeDeliveryTicket;
+exports.cancelDeliveryTicket = cancelDeliveryTicket;
+exports.ensureDeliveryTicket = ensureDeliveryTicket;
 const discord_js_1 = require("discord.js");
 const env_1 = require("../config/env");
 const logger_1 = require("../lib/logger");
@@ -116,8 +116,10 @@ async function closeDeliveryTicket(orderId, actor) {
             catch (patchErr) {
                 logger_1.logger.warn('Falha ao renomear/atualizar tópico do canal ao arquivar ticket', { orderId, channelId: existingChannel.id, error: patchErr?.message || String(patchErr) });
             }
+            // Tenta aplicar overwrite de permissão para tornar somente leitura; não falhará o fluxo se der erro
             try {
                 const denySend = new discord_js_1.PermissionsBitField([discord_js_1.PermissionFlagsBits.SendMessages]).bitfield.toString();
+                // Negar envio para @everyone (guildId) e para o usuário do pedido, quando disponível
                 await rest.put(`/channels/${existingChannel.id}/permissions/${env_1.config.discord.guildId}`, {
                     body: {
                         deny: denySend,
@@ -158,10 +160,11 @@ async function cancelDeliveryTicket(orderId, actor) {
             logger_1.logger.warn('Pedido não encontrado ao tentar cancelar', { orderId });
             return false;
         }
+        // Repor estoque
         try {
             const productServiceModule = await Promise.resolve().then(() => __importStar(require('./product.service')));
             const currentProduct = await productServiceModule.getProduct(order.productId);
-            const newQuantity = ((currentProduct === null || currentProduct === void 0 ? void 0 : currentProduct.quantity) || 0) + order.quantity;
+            const newQuantity = (currentProduct?.quantity || 0) + order.quantity;
             await productServiceModule.updateProductQuantity(order.productId, newQuantity);
         }
         catch (err) {
@@ -172,6 +175,7 @@ async function cancelDeliveryTicket(orderId, actor) {
         }
         catch (err) {
             logger_1.logger.error('Erro ao atualizar status do pedido para CANCELLED', { orderId, error: String(err) });
+            // Continuar com o fluxo de notificação mesmo que a atualização tenha falhado
         }
         try {
             const rest = new discord_js_1.REST({ version: '10' }).setToken(env_1.config.discord.token);

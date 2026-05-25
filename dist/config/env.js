@@ -9,6 +9,7 @@ dotenv_1.default.config();
 const requiredEnvVars = [
     'DISCORD_TOKEN',
     'DISCORD_CLIENT_ID',
+    'DISCORD_GUILD_ID',
     'DATABASE_URL',
 ];
 function validateEnv() {
