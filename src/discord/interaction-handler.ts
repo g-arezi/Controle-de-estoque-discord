@@ -720,6 +720,7 @@ async function handleButtonInteraction(interaction: ButtonInteraction): Promise<
             .setTitle('💳 Pagamento via PIX')
             .setColor(EMBED_COLORS.danger)
             .addFields({ name: 'Chave PIX', value: `\`${pixKey}\`` })
+            .setDescription('**Favor mandar comprovante do pagamento neste ticket**')
             .setTimestamp(),
         ],
       ephemeral: true,
