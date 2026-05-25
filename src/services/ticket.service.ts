@@ -65,9 +65,171 @@ function buildTicketComponents(stage: TicketStage, orderId: string) {
       new ButtonBuilder()
         .setCustomId(`ticket_buy_${orderId}`)
         .setLabel('Pagar Agora')
-        .setStyle(ButtonStyle.Success)
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(`admin_close_ticket_${orderId}`)
+        .setLabel('Fechar Ticket')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(`admin_cancel_order_${orderId}`)
+        .setLabel('Cancelar Pedido')
+        .setStyle(ButtonStyle.Danger)
     ),
   ];
+}
+
+export async function closeDeliveryTicket(orderId: string, actor?: string) {
+  try {
+    const rest = new REST({ version: '10' }).setToken(config.discord.token);
+    const order = await orderService.getOrder(orderId);
+
+    const channels = (await rest.get(Routes.guildChannels(config.discord.guildId))) as Array<{
+      id: string;
+      name: string;
+      topic?: string | null;
+      type: number;
+    }>;
+
+    const existingChannel = channels.find(
+      (channel) => channel.type === ChannelType.GuildText && channel.topic?.includes(orderId)
+    );
+
+    if (!existingChannel) {
+      logger.warn('Canal do ticket não encontrado para fechar', { orderId });
+      return false;
+    }
+
+    try {
+      await rest.post(Routes.channelMessages(existingChannel.id), {
+        body: {
+          content: `🔒 Ticket fechado pelo administrador${actor ? ` (${actor})` : ''}`,
+        },
+      });
+
+      const newName = existingChannel.name?.startsWith('fechado-') ? existingChannel.name : `fechado-${existingChannel.name}`;
+      const newTopic = (existingChannel.topic || '') + ' - FECHADO';
+
+      try {
+        await rest.patch(Routes.channel(existingChannel.id), {
+          body: {
+            name: newName,
+            topic: newTopic,
+          },
+        });
+      } catch (patchErr: any) {
+        logger.warn('Falha ao renomear/atualizar tópico do canal ao arquivar ticket', { orderId, channelId: existingChannel.id, error: patchErr?.message || String(patchErr) });
+      }
+
+      // Tenta aplicar overwrite de permissão para tornar somente leitura; não falhará o fluxo se der erro
+      try {
+        const denySend = new PermissionsBitField([PermissionFlagsBits.SendMessages]).bitfield.toString();
+
+        // Negar envio para @everyone (guildId) e para o usuário do pedido, quando disponível
+        await rest.put(
+          `/channels/${existingChannel.id}/permissions/${config.discord.guildId}`,
+          {
+            body: {
+              deny: denySend,
+              allow: '0',
+              type: 0,
+            },
+          }
+        );
+
+        if (order?.discordUserId) {
+          await rest.put(
+            `/channels/${existingChannel.id}/permissions/${order.discordUserId}`,
+            {
+              body: {
+                deny: denySend,
+                allow: '0',
+                type: 1,
+              },
+            }
+          );
+        }
+      } catch (permErr: any) {
+        logger.warn('Falha ao atualizar permissões do canal ao arquivar ticket (pode ser falta de permissão)', { orderId, channelId: existingChannel.id, error: permErr?.message || String(permErr) });
+      }
+
+      logger.info('Ticket fechado e canal arquivado (somente leitura)', { orderId, channelId: existingChannel.id, actor });
+      return true;
+    } catch (error: any) {
+      logger.error('Falha ao fechar ticket (post/patch)', { orderId, error: error?.message || String(error) });
+      return false;
+    }
+  } catch (err: any) {
+    logger.error('Erro ao buscar canais para fechar ticket', { orderId, error: err?.message || String(err) });
+    return false;
+  }
+}
+
+export async function cancelDeliveryTicket(orderId: string, actor?: string) {
+  try {
+    const order = await orderService.getOrder(orderId);
+    if (!order) {
+      logger.warn('Pedido não encontrado ao tentar cancelar', { orderId });
+      return false;
+    }
+
+    // Repor estoque
+    try {
+      const productServiceModule = await import('./product.service');
+      const currentProduct = await productServiceModule.getProduct(order.productId);
+      const newQuantity = (currentProduct?.quantity || 0) + order.quantity;
+      await productServiceModule.updateProductQuantity(order.productId, newQuantity);
+    } catch (err) {
+      logger.error('Erro ao repor estoque ao cancelar pedido', { orderId, error: String(err) });
+    }
+
+    try {
+      await orderService.updateOrderStatus(orderId, 'CANCELLED');
+    } catch (err) {
+      logger.error('Erro ao atualizar status do pedido para CANCELLED', { orderId, error: String(err) });
+      // Continuar com o fluxo de notificação mesmo que a atualização tenha falhado
+    }
+
+    try {
+      const rest = new REST({ version: '10' }).setToken(config.discord.token);
+
+      const channels = (await rest.get(Routes.guildChannels(config.discord.guildId))) as Array<{
+        id: string;
+        name: string;
+        topic?: string | null;
+        type: number;
+      }>;
+
+      const existingChannel = channels.find(
+        (channel) => channel.type === ChannelType.GuildText && channel.topic?.includes(orderId)
+      );
+
+      if (existingChannel) {
+        try {
+          await rest.post(Routes.channelMessages(existingChannel.id), {
+            body: {
+              content: `❌ Pedido cancelado pelo administrador${actor ? ` (${actor})` : ''}`,
+            },
+          });
+
+          try {
+            await rest.delete(Routes.channel(existingChannel.id));
+          } catch (delErr: any) {
+            logger.warn('Falha ao deletar canal do ticket ao cancelar pedido (pode ser falta de permissão)', { orderId, channelId: existingChannel.id, error: delErr?.message || String(delErr) });
+          }
+        } catch (err: any) {
+          logger.error('Erro ao notificar canal do ticket ao cancelar pedido', { orderId, error: err?.message || String(err) });
+        }
+      }
+    } catch (err: any) {
+      logger.error('Erro ao buscar canais para notificar cancelamento', { orderId, error: err?.message || String(err) });
+    }
+
+    logger.info('Pedido cancelado pelo administrador', { orderId, actor });
+    return true;
+  } catch (err: any) {
+    logger.error('Erro inesperado ao cancelar pedido', { orderId, error: err?.message || String(err) });
+    return false;
+  }
 }
 
 async function notifyAdmins(rest: REST, order: Awaited<ReturnType<typeof orderService.getOrder>>) {

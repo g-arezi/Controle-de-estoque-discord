@@ -58,6 +58,9 @@ async function handleInteraction(interaction) {
         else if (interaction.isButton()) {
             await handleButtonInteraction(interaction);
         }
+        else if (interaction.isModalSubmit && interaction.isModalSubmit()) {
+            await handleModalSubmit(interaction);
+        }
         else if (interaction.isStringSelectMenu && interaction.isStringSelectMenu()) {
             await handleSelectInteraction(interaction);
         }
@@ -102,6 +105,34 @@ async function handleSelectInteraction(interaction) {
             .setStyle(discord_js_1.ButtonStyle.Secondary));
         await interaction.reply({ embeds: [embed], components: [buttons], ephemeral: true });
     }
+    }
+    async function handleModalSubmit(interaction) {
+        const customId = interaction.customId;
+        if (customId.startsWith('confirm_cancel_order_')) {
+            const orderId = customId.replace('confirm_cancel_order_', '');
+            if (!interaction.memberPermissions || !interaction.memberPermissions.has('Administrator')) {
+                await interaction.reply({ content: '❌ Apenas administradores podem confirmar este cancelamento.', ephemeral: true });
+                return;
+            }
+            const confirmation = (interaction.fields.getTextInputValue('confirm_text') || '').trim().toUpperCase();
+            if (confirmation !== 'CONFIRMAR') {
+                await interaction.reply({ content: 'Ação cancelada: texto de confirmação incorreto.', ephemeral: true });
+                return;
+            }
+            try {
+                const result = await ticketService.cancelDeliveryTicket(orderId, `${interaction.user.username}`);
+                if (result) {
+                    await interaction.reply({ content: '✅ Pedido cancelado e ticket fechado.', ephemeral: true });
+                }
+                else {
+                    await interaction.reply({ content: '⚠️ Pedido cancelado, mas houve problemas ao fechar o ticket.', ephemeral: true });
+                }
+            }
+            catch (err) {
+                logger_1.logger.error('Erro ao processar confirmação de cancelamento', err);
+                await interaction.reply({ content: '❌ Falha ao cancelar o pedido.', ephemeral: true });
+            }
+        }
 }
 async function handleSlashCommand(interaction) {
     const commandName = interaction.commandName;
@@ -697,7 +728,52 @@ async function handleButtonInteraction(interaction) {
             ],
             ephemeral: true,
         });
-    }
+        }
+        else if (customId.startsWith('admin_close_ticket_')) {
+            const orderId = customId.replace('admin_close_ticket_', '');
+            if (!interaction.memberPermissions || !interaction.memberPermissions.has('Administrator')) {
+                await interaction.reply({ content: '❌ Apenas administradores podem usar este botão.', ephemeral: true });
+                return;
+            }
+            try {
+                        const closed = await ticketService.closeDeliveryTicket(orderId, `${interaction.user.username}`);
+                        if (closed) {
+                            await interaction.reply({ content: '🔒 Ticket fechado e canal arquivado (somente leitura).', ephemeral: true });
+                        }
+                        else {
+                            await interaction.reply({ content: '⚠️ Ticket marcado como fechado, porém houve problemas ao arquivar o canal.', ephemeral: true });
+                        }
+            }
+            catch (err) {
+                logger_1.logger.error('Erro ao fechar ticket via botão admin', err);
+                await interaction.reply({ content: '❌ Falha ao fechar o ticket.', ephemeral: true });
+            }
+        }
+        else if (customId.startsWith('admin_cancel_order_')) {
+            const orderId = customId.replace('admin_cancel_order_', '');
+            if (!interaction.memberPermissions || !interaction.memberPermissions.has('Administrator')) {
+                await interaction.reply({ content: '❌ Apenas administradores podem usar este botão.', ephemeral: true });
+                return;
+            }
+            try {
+                const modal = new discord_js_1.ModalBuilder()
+                    .setCustomId(`confirm_cancel_order_${orderId}`)
+                    .setTitle('Confirmar cancelamento');
+                const input = new discord_js_1.TextInputBuilder()
+                    .setCustomId('confirm_text')
+                    .setLabel('Digite CONFIRMAR para cancelar o pedido')
+                    .setStyle(discord_js_1.TextInputStyle.Short)
+                    .setPlaceholder('CONFIRMAR')
+                    .setRequired(true);
+                const row = new discord_js_1.ActionRowBuilder().addComponents(input);
+                modal.addComponents(row);
+                await interaction.showModal(modal);
+            }
+            catch (err) {
+                logger_1.logger.error('Erro ao abrir modal de confirmação', err);
+                await interaction.reply({ content: '❌ Não foi possível abrir o modal de confirmação.', ephemeral: true });
+            }
+        }
 }
 async function handleTypesCommand(interaction) {
     // Verificar permissões
