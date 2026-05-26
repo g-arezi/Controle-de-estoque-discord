@@ -29,6 +29,8 @@ const EMBED_COLORS = {
   neutral: 0x000000,
 } as const;
 
+const MENU_FOOTER = 'Desenvolvido por arezi_dev (https://gabriel-arezi.vercel.app)';
+
 export async function handleInteraction(interaction: any): Promise<void> {
   try {
     if (interaction.isChatInputCommand()) {
@@ -191,6 +193,7 @@ async function handleMenuCommand(interaction: ChatInputCommandInteraction): Prom
         { name: 'Disponíveis', value: String(availableProducts), inline: true },
         { name: 'Fora de estoque', value: String(outOfStock), inline: true }
       )
+      .setFooter({ text: MENU_FOOTER })
       .setTimestamp();
 
     const embeds: EmbedBuilder[] = [embed];
@@ -277,6 +280,7 @@ async function handleMenuCanalCommand(interaction: ChatInputCommandInteraction):
         { name: 'Disponíveis', value: String(availableProducts), inline: true },
         { name: 'Fora de estoque', value: String(outOfStock), inline: true }
       )
+      .setFooter({ text: MENU_FOOTER })
       .setTimestamp();
 
     const embeds: EmbedBuilder[] = [embed];
@@ -766,7 +770,14 @@ async function handleButtonInteraction(interaction: ButtonInteraction): Promise<
 
     const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select as any);
 
-    await interaction.reply({ embeds: [], components: [row] });
+    const embed = new EmbedBuilder()
+      .setTitle('🛒 Seja bem-vindo')
+      .setColor(EMBED_COLORS.neutral)
+      .setDescription('**Seja bem-vindo ao sistema de vendas**\n\nUse o menu abaixo para escolher um produto.')
+      .setFooter({ text: MENU_FOOTER })
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed], components: [row] });
   } else if (customId.startsWith('ticket_buy_')) {
     const orderId = customId.replace('ticket_buy_', '');
     const order = await orderService.getOrder(orderId);

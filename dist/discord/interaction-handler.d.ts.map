@@ -1,1 +1,1 @@
-{"version":3,"file":"interaction-handler.d.ts","sourceRoot":"","sources":["../../src/discord/interaction-handler.ts"],"names":[],"mappings":"AA+BA,wBAAsB,iBAAiB,CAAC,WAAW,EAAE,GAAG,GAAG,OAAO,CAAC,IAAI,CAAC,CAkBvE"}
+{"version":3,"file":"interaction-handler.d.ts","sourceRoot":"","sources":["../../src/discord/interaction-handler.ts"],"names":[],"mappings":"AAiCA,wBAAsB,iBAAiB,CAAC,WAAW,EAAE,GAAG,GAAG,OAAO,CAAC,IAAI,CAAC,CAkBvE"}

@@ -50,6 +50,7 @@ const EMBED_COLORS = {
     danger: 0x4a0f0f,
     neutral: 0x000000,
 };
+const MENU_FOOTER = 'Desenvolvido por arezi_dev (https://gabriel-arezi.vercel.app)';
 async function handleInteraction(interaction) {
     try {
         if (interaction.isChatInputCommand()) {
@@ -186,6 +187,7 @@ async function handleMenuCommand(interaction) {
             .setDescription('**Seja bem-vindo ao sistema de vendas**\n\nUse o menu abaixo para escolher um produto.')
             .setThumbnail(botAvatar)
             .addFields({ name: 'Total de produtos', value: String(totalProducts), inline: true }, { name: 'Disponíveis', value: String(availableProducts), inline: true }, { name: 'Fora de estoque', value: String(outOfStock), inline: true })
+            .setFooter({ text: MENU_FOOTER })
             .setTimestamp();
         const embeds = [embed];
         // Select menu para escolher produtos (label = nome, description = preço | estoque)
@@ -256,6 +258,7 @@ async function handleMenuCanalCommand(interaction) {
             .setDescription('**Seja bem-vindo ao sistema de vendas**\n\nUse o menu abaixo para escolher um produto.')
             .setThumbnail(botAvatar)
             .addFields({ name: 'Total de produtos', value: String(totalProducts), inline: true }, { name: 'Disponíveis', value: String(availableProducts), inline: true }, { name: 'Fora de estoque', value: String(outOfStock), inline: true })
+            .setFooter({ text: MENU_FOOTER })
             .setTimestamp();
         const embeds = [embed];
         // Select menu para escolher produtos (label = nome, description = preço | estoque)
@@ -654,7 +657,13 @@ async function handleButtonInteraction(interaction) {
             .setMinValues(1)
             .setMaxValues(1);
         const row = new discord_js_1.ActionRowBuilder().addComponents(select);
-        await interaction.reply({ embeds: [], components: [row] });
+        const embed = new discord_js_1.EmbedBuilder()
+            .setTitle('🛒 Seja bem-vindo')
+            .setColor(EMBED_COLORS.neutral)
+            .setDescription('**Seja bem-vindo ao sistema de vendas**\n\nUse o menu abaixo para escolher um produto.')
+            .setFooter({ text: MENU_FOOTER })
+            .setTimestamp();
+        await interaction.reply({ embeds: [embed], components: [row] });
     }
     else if (customId.startsWith('ticket_buy_')) {
         const orderId = customId.replace('ticket_buy_', '');
