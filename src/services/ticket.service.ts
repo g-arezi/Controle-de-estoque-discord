@@ -106,6 +106,13 @@ export async function closeDeliveryTicket(orderId: string, actor?: string) {
         },
       });
 
+        // Remover cargo temporário do usuário, se existir
+        try {
+          await removeTempRoleForTicket(rest, orderId, order?.discordUserId);
+        } catch (remErr: any) {
+          logger.warn('Erro ao remover cargo temporário ao fechar ticket', { orderId, error: remErr?.message || String(remErr) });
+        }
+
       const newName = existingChannel.name?.startsWith('fechado-') ? existingChannel.name : `fechado-${existingChannel.name}`;
       const newTopic = (existingChannel.topic || '') + ' - FECHADO';
 
@@ -211,6 +218,13 @@ export async function cancelDeliveryTicket(orderId: string, actor?: string) {
             },
           });
 
+          // Remover cargo temporário do usuário, se existir
+          try {
+            await removeTempRoleForTicket(rest, orderId, order.discordUserId);
+          } catch (remErr: any) {
+            logger.warn('Erro ao remover cargo temporário ao cancelar pedido', { orderId, error: remErr?.message || String(remErr) });
+          }
+
           try {
             await rest.delete(Routes.channel(existingChannel.id));
           } catch (delErr: any) {
@@ -254,6 +268,58 @@ async function notifyAdmins(rest: REST, order: Awaited<ReturnType<typeof orderSe
       },
     },
   });
+}
+
+async function createTempRoleForTicket(rest: REST, orderId: string, userId?: string) {
+  if (!userId) return null;
+
+  const roleName = `ticket-viewer-${orderId.slice(-8).toUpperCase()}`;
+
+  try {
+    const role = (await rest.post(Routes.guildRoles(config.discord.guildId), {
+      body: {
+        name: roleName,
+        permissions: '0',
+        mentionable: false,
+      },
+    })) as { id: string; name: string };
+
+    // Assign role to the user
+    try {
+      await rest.put(`/guilds/${config.discord.guildId}/members/${userId}/roles/${role.id}`, {});
+    } catch (assignErr: any) {
+      logger.warn('Falha ao atribuir cargo temporário ao usuário do ticket', { orderId, userId, error: assignErr?.message || String(assignErr) });
+    }
+
+    return role;
+  } catch (err: any) {
+    logger.warn('Falha ao criar cargo temporário para ticket', { orderId, error: err?.message || String(err) });
+    return null;
+  }
+}
+
+async function removeTempRoleForTicket(rest: REST, orderId: string, userId?: string) {
+  if (!userId) return;
+
+  try {
+    const roles = (await rest.get(Routes.guildRoles(config.discord.guildId))) as Array<{ id: string; name: string }>;
+    const role = roles.find((r) => r.name === `ticket-viewer-${orderId.slice(-8).toUpperCase()}`);
+    if (!role) return;
+
+    try {
+      await rest.delete(`/guilds/${config.discord.guildId}/members/${userId}/roles/${role.id}`);
+    } catch (remErr: any) {
+      logger.warn('Falha ao remover cargo temporário do usuário', { orderId, userId, roleId: role.id, error: remErr?.message || String(remErr) });
+    }
+
+    try {
+      await rest.delete(`/guilds/${config.discord.guildId}/roles/${role.id}`);
+    } catch (delErr: any) {
+      logger.warn('Falha ao deletar cargo temporário do ticket', { orderId, roleId: role.id, error: delErr?.message || String(delErr) });
+    }
+  } catch (err: any) {
+    logger.warn('Erro buscando cargos do servidor para remover cargo temporário', { orderId, error: err?.message || String(err) });
+  }
 }
 
 /**
@@ -324,23 +390,55 @@ export async function ensureDeliveryTicket(orderId: string, stage: TicketStage =
       PermissionFlagsBits.ReadMessageHistory,
     ]).bitfield.toString();
 
+    // Se for chamado no fluxo de checkout (pending), cria um cargo temporário para o usuário
+    let tempRole: { id: string; name: string } | null = null;
+    if (stage === 'pending') {
+      tempRole = await createTempRoleForTicket(rest, orderId, order.discordUserId);
+    }
+
+    // Monta overwrites; se houver cargo temporário, usa ele para permitir apenas visualização
+    const denyEveryoneView = new PermissionsBitField([PermissionFlagsBits.ViewChannel]).bitfield.toString();
+    const allowRoleView = new PermissionsBitField([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory]).bitfield.toString();
+    const denyRoleSend = new PermissionsBitField([PermissionFlagsBits.SendMessages]).bitfield.toString();
+
+    const permissionOverwrites: Array<any> = [];
+
+    // Negar view para @everyone
+    permissionOverwrites.push({ id: config.discord.guildId, deny: denyEveryoneView });
+
+    if (tempRole) {
+      // Permissões do cargo temporário: ver e ler histórico, mas não enviar mensagens
+      permissionOverwrites.push({ id: tempRole.id, allow: allowRoleView, deny: denyRoleSend, type: 0 });
+    } else {
+      // Fallback: permitir explicitamente para o usuário
+      permissionOverwrites.push({ id: order.discordUserId, allow: ticketPermissions, type: 1 });
+    }
+
+    // Verifica se a categoria configurada existe e é do tipo Category antes de usar como parent
+    const category = config.discord.ticketCategoryId
+      ? (channels.find((c) => c.id === config.discord.ticketCategoryId && c.type === ChannelType.GuildCategory) as any)
+      : null;
+
+    if (config.discord.ticketCategoryId && !category) {
+      logger.warn('TICKET_CATEGORY_ID configurado, mas não é uma categoria válida no servidor; criando canal sem parent', {
+        ticketCategoryId: config.discord.ticketCategoryId,
+        orderId,
+      });
+    }
+
+    const createBody: any = {
+      name: buildTicketChannelName(orderId),
+      type: ChannelType.GuildText,
+      topic: `Ticket de entrega do pedido ${orderId}`,
+      permission_overwrites: permissionOverwrites,
+    };
+
+    if (category) {
+      createBody.parent_id = config.discord.ticketCategoryId;
+    }
+
     const ticketChannel = (await rest.post(Routes.guildChannels(config.discord.guildId), {
-      body: {
-        name: buildTicketChannelName(orderId),
-        type: ChannelType.GuildText,
-        topic: `Ticket de entrega do pedido ${orderId}`,
-        parent_id: config.discord.ticketCategoryId,
-        permission_overwrites: [
-          {
-            id: config.discord.guildId,
-            deny: ticketPermissions,
-          },
-          {
-            id: order.discordUserId,
-            allow: ticketPermissions,
-          },
-        ],
-      },
+      body: createBody,
     })) as { id: string; name: string };
 
     await rest.post(Routes.channelMessages(ticketChannel.id), {

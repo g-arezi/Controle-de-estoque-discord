@@ -29,6 +29,7 @@ exports.config = {
         token: process.env.DISCORD_TOKEN,
         clientId: process.env.DISCORD_CLIENT_ID,
         estoqueChannelId: process.env.ESTOQUE_CHANNEL_ID,
+        ticketCategoryId: process.env.TICKET_CATEGORY_ID,
         guildId: process.env.DISCORD_GUILD_ID,
     },
     database: {

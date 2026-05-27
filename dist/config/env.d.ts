@@ -3,6 +3,7 @@ export declare const config: {
         token: string;
         clientId: string;
         estoqueChannelId: string;
+        ticketCategoryId: string | undefined;
         guildId: string;
     };
     database: {
