@@ -329,6 +329,7 @@ export async function ensureDeliveryTicket(orderId: string, stage: TicketStage =
         name: buildTicketChannelName(orderId),
         type: ChannelType.GuildText,
         topic: `Ticket de entrega do pedido ${orderId}`,
+        parent_id: config.discord.ticketCategoryId,
         permission_overwrites: [
           {
             id: config.discord.guildId,
