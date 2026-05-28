@@ -165,6 +165,34 @@ async function cancelDeliveryTicket(orderId, actor) {
         const order = await orderService.getOrder(orderId);
         if (!order) {
             logger_1.logger.warn('Pedido não encontrado ao tentar cancelar', { orderId });
+            // Mesmo que o pedido não exista no banco, tentar ao menos remover o canal/thread
+            try {
+                const restFallback = new discord_js_1.REST({ version: '10' }).setToken(env_1.config.discord.token);
+                const channelsFallback = (await restFallback.get(discord_js_1.Routes.guildChannels(env_1.config.discord.guildId)));
+                const existingChannelFallback = channelsFallback.find((channel) => channel.type === discord_js_1.ChannelType.GuildText && channel.topic?.includes(orderId));
+                if (existingChannelFallback) {
+                    try {
+                        await restFallback.post(discord_js_1.Routes.channelMessages(existingChannelFallback.id), {
+                            body: {
+                                content: `❌ Pedido cancelado pelo administrador${actor ? ` (${actor})` : ''}`,
+                            },
+                        });
+                    }
+                    catch (errMsg) {
+                        logger_1.logger.warn('Falha ao notificar canal do ticket (pedido não encontrado)', { orderId, channelId: existingChannelFallback.id, error: errMsg?.message || String(errMsg) });
+                    }
+                    try {
+                        await restFallback.delete(discord_js_1.Routes.channel(existingChannelFallback.id));
+                        logger_1.logger.info('Canal do ticket removido apesar de pedido inexistente', { orderId, channelId: existingChannelFallback.id, actor });
+                    }
+                    catch (delErr) {
+                        logger_1.logger.warn('Falha ao deletar canal do ticket (pedido não encontrado, possivelmente falta de permissão)', { orderId, channelId: existingChannelFallback.id, error: delErr?.message || String(delErr) });
+                    }
+                }
+            }
+            catch (errFallback) {
+                logger_1.logger.error('Erro ao tentar remover canal do ticket para pedido inexistente', { orderId, error: errFallback?.message || String(errFallback) });
+            }
             return false;
         }
         // Repor estoque

@@ -176,6 +176,43 @@ export async function cancelDeliveryTicket(orderId: string, actor?: string) {
     const order = await orderService.getOrder(orderId);
     if (!order) {
       logger.warn('Pedido não encontrado ao tentar cancelar', { orderId });
+
+      // Mesmo que o pedido não exista no banco, tentar ao menos remover o canal/thread
+      try {
+        const restFallback = new REST({ version: '10' }).setToken(config.discord.token);
+        const channelsFallback = (await restFallback.get(Routes.guildChannels(config.discord.guildId))) as Array<{
+          id: string;
+          name: string;
+          topic?: string | null;
+          type: number;
+        }>;
+
+        const existingChannelFallback = channelsFallback.find(
+          (channel) => channel.type === ChannelType.GuildText && channel.topic?.includes(orderId)
+        );
+
+        if (existingChannelFallback) {
+          try {
+            await restFallback.post(Routes.channelMessages(existingChannelFallback.id), {
+              body: {
+                content: `❌ Pedido cancelado pelo administrador${actor ? ` (${actor})` : ''}`,
+              },
+            });
+          } catch (errMsg: any) {
+            logger.warn('Falha ao notificar canal do ticket (pedido não encontrado)', { orderId, channelId: existingChannelFallback.id, error: errMsg?.message || String(errMsg) });
+          }
+
+          try {
+            await restFallback.delete(Routes.channel(existingChannelFallback.id));
+            logger.info('Canal do ticket removido apesar de pedido inexistente', { orderId, channelId: existingChannelFallback.id, actor });
+          } catch (delErr: any) {
+            logger.warn('Falha ao deletar canal do ticket (pedido não encontrado, possivelmente falta de permissão)', { orderId, channelId: existingChannelFallback.id, error: delErr?.message || String(delErr) });
+          }
+        }
+      } catch (errFallback: any) {
+        logger.error('Erro ao tentar remover canal do ticket para pedido inexistente', { orderId, error: errFallback?.message || String(errFallback) });
+      }
+
       return false;
     }
 
