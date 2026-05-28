@@ -125,23 +125,44 @@ async function closeDeliveryTicket(orderId, actor) {
             }
             // Tenta aplicar overwrite de permissão para tornar somente leitura; não falhará o fluxo se der erro
             try {
-                const denySend = new discord_js_1.PermissionsBitField([discord_js_1.PermissionFlagsBits.SendMessages]).bitfield.toString();
-                // Negar envio para @everyone (guildId) e para o usuário do pedido, quando disponível
+                // Negar visibilidade para @everyone
+                const denyView = new discord_js_1.PermissionsBitField([discord_js_1.PermissionFlagsBits.ViewChannel]).bitfield.toString();
                 await rest.put(`/channels/${existingChannel.id}/permissions/${env_1.config.discord.guildId}`, {
                     body: {
-                        deny: denySend,
+                        deny: denyView,
                         allow: '0',
                         type: 0,
                     },
                 });
-                if (order?.discordUserId) {
-                    await rest.put(`/channels/${existingChannel.id}/permissions/${order.discordUserId}`, {
-                        body: {
-                            deny: denySend,
-                            allow: '0',
-                            type: 1,
-                        },
+                // Buscar cargos do servidor e permitir visibilidade apenas para cargos com permissão Administrator
+                try {
+                    const roles = (await rest.get(discord_js_1.Routes.guildRoles(env_1.config.discord.guildId)));
+                    const adminRoles = roles.filter((r) => {
+                        try {
+                            return (BigInt(r.permissions) & BigInt(discord_js_1.PermissionFlagsBits.Administrator)) !== BigInt(0);
+                        }
+                        catch (e) {
+                            return false;
+                        }
                     });
+                    const allowView = new discord_js_1.PermissionsBitField([discord_js_1.PermissionFlagsBits.ViewChannel, discord_js_1.PermissionFlagsBits.ReadMessageHistory]).bitfield.toString();
+                    for (const role of adminRoles) {
+                        try {
+                            await rest.put(`/channels/${existingChannel.id}/permissions/${role.id}`, {
+                                body: {
+                                    allow: allowView,
+                                    deny: '0',
+                                    type: 0,
+                                },
+                            });
+                        }
+                        catch (innerErr) {
+                            logger_1.logger.warn('Falha ao aplicar overwrite para cargo administrador ao arquivar ticket', { orderId, roleId: role.id, error: innerErr?.message || String(innerErr) });
+                        }
+                    }
+                }
+                catch (rolesErr) {
+                    logger_1.logger.warn('Falha ao buscar cargos do servidor para aplicar overwrites de visibilidade', { orderId, error: rolesErr?.message || String(rolesErr) });
                 }
             }
             catch (permErr) {
