@@ -54,6 +54,7 @@ const app = (0, server_1.createExpressApp)();
 // Event: Bot conectado
 client.once(discord_js_1.Events.ClientReady, async () => {
     logger_1.logger.info(`✅ Bot conectado como ${client.user?.tag}`);
+    logger_1.logger.info(`Connectado nos servidores: ${client.guilds.cache.map((g) => g.name).join(', ')}`);
     // Registrar comandos
     try {
         await (0, register_commands_1.registerCommands)();

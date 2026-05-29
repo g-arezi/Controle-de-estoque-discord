@@ -22,7 +22,7 @@ const app = createExpressApp();
 // Event: Bot conectado
 client.once(Events.ClientReady, async () => {
   logger.info(`✅ Bot conectado como ${client.user?.tag}`);
-
+  logger.info(`Connectado nos servidores: ${client.guilds.cache.map((g) => g.name).join(', ')}`);
   // Registrar comandos
   try {
     await registerCommands();
