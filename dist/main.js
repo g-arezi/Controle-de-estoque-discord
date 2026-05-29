@@ -52,7 +52,7 @@ const client = new discord_js_1.Client({
 // Servidor Express
 const app = (0, server_1.createExpressApp)();
 // Event: Bot conectado
-client.on('ready', async () => {
+client.once(discord_js_1.Events.ClientReady, async () => {
     logger_1.logger.info(`✅ Bot conectado como ${client.user?.tag}`);
     // Registrar comandos
     try {

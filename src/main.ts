@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits } from 'discord.js';
+import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { config } from './config/env';
 import { logger } from './lib/logger';
 import { prisma } from './config/prisma';
@@ -20,7 +20,7 @@ const client = new Client({
 const app = createExpressApp();
 
 // Event: Bot conectado
-client.on('ready', async () => {
+client.once(Events.ClientReady, async () => {
   logger.info(`✅ Bot conectado como ${client.user?.tag}`);
 
   // Registrar comandos

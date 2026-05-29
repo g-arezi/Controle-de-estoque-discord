@@ -43,6 +43,7 @@ cp .env.example .env
 2. Build e suba os containers:
 
 ```bash
+docker compose down --remove-orphans
 docker compose up -d --build
 ```
 
@@ -82,7 +83,7 @@ npx prisma migrate deploy
 
 ```bash
 npm run build
-node dist/src/main.js
+node dist/main.js
 ```
 
 ## Variáveis de ambiente
@@ -153,6 +154,7 @@ Exemplos:
 - Bot não responde aos comandos:
 
 ```bash
+docker compose down --remove-orphans
 docker compose restart app
 ```
 

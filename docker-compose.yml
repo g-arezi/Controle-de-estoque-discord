@@ -1,7 +1,6 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: discord_stock_db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-discord}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-discord123}
@@ -22,9 +21,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: discord_stock_bot
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-discord}:${POSTGRES_PASSWORD:-discord123}@postgres:5432/${POSTGRES_DB:-discord_stock}?schema=public
       DISCORD_TOKEN: ${DISCORD_TOKEN}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
       ESTOQUE_CHANNEL_ID: ${ESTOQUE_CHANNEL_ID}
@@ -40,9 +38,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      - .:/app
-      - /app/node_modules
     networks:
       - discord_network
     restart: unless-stopped

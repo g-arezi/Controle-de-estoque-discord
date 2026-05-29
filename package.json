@@ -2,7 +2,7 @@
   "name": "discord-estoque-bot",
   "version": "1.0.0",
   "description": "Bot profissional para gerenciamento de estoque no Discord",
-  "main": "dist/src/main.js",
+  "main": "dist/main.js",
   "scripts": {
     "dev": "ts-node src/main.ts",
     "build": "tsc",
