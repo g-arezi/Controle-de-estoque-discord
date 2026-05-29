@@ -41,6 +41,7 @@ const money_1 = require("../lib/money");
 const productService = __importStar(require("../services/product.service"));
 const productTypeService = __importStar(require("../services/product-type.service"));
 const orderService = __importStar(require("../services/order.service"));
+const payment_service_1 = require("../services/payment.service");
 const auditService = __importStar(require("../services/audit.service"));
 const ticketService = __importStar(require("../services/ticket.service"));
 const rate_limit_service_1 = require("../services/rate-limit.service");
@@ -324,6 +325,25 @@ async function handleBuyCommand(interaction) {
             productId,
             quantity: 1,
         });
+        let paymentData = null;
+        try {
+            paymentData = await (0, payment_service_1.createPayment)({
+                orderId: order.id,
+                amount: Number(order.totalPrice),
+                description: product.name,
+            });
+            await orderService.updateOrderStatus(order.id, 'PENDING', {
+                paymentId: paymentData.id,
+                paymentUrl: paymentData.payment_url,
+                pixKey: paymentData.pix_key || env_1.config.payment.pixKey,
+            });
+        }
+        catch (error) {
+            logger_1.logger.warn('Falha ao gerar pagamento, seguindo com fallback de PIX', {
+                orderId: order.id,
+                error: error instanceof Error ? error.message : String(error),
+            });
+        }
         // Registrar auditoria
         await auditService.createAuditLog({
             discordUserId: interaction.user.id,
@@ -693,7 +713,7 @@ async function handleButtonInteraction(interaction) {
             });
             return;
         }
-        const pixKey = env_1.config.payment.pixKey || 'Será informada em breve';
+        const pixKey = order.pixKey || env_1.config.payment.pixKey || 'Será informada em breve';
         await interaction.reply({
             embeds: [
                 new discord_js_1.EmbedBuilder()

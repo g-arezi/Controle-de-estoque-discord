@@ -22,7 +22,7 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-discord}:${POSTGRES_PASSWORD:-discord123}@postgres:5432/${POSTGRES_DB:-discord_stock}?schema=public
+      DATABASE_URL: ${DATABASE_URL}
       DISCORD_TOKEN: ${DISCORD_TOKEN}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
       ESTOQUE_CHANNEL_ID: ${ESTOQUE_CHANNEL_ID}
@@ -32,6 +32,7 @@ services:
       INFINITEPAY_API_KEY: ${INFINITEPAY_API_KEY}
       INFINITEPAY_SECRET: ${INFINITEPAY_SECRET}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      PIX_KEY: ${PIX_KEY}
       NODE_ENV: production
     ports:
       - "3000:3000"

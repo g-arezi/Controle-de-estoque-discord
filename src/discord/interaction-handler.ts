@@ -18,6 +18,7 @@ import { formatMoney } from '../lib/money';
 import * as productService from '../services/product.service';
 import * as productTypeService from '../services/product-type.service';
 import * as orderService from '../services/order.service';
+import { createPayment } from '../services/payment.service';
 import * as auditService from '../services/audit.service';
 import * as ticketService from '../services/ticket.service';
 import { checkRateLimit } from '../services/rate-limit.service';
@@ -362,6 +363,27 @@ async function handleBuyCommand(interaction: ChatInputCommandInteraction): Promi
       productId,
       quantity: 1,
     });
+
+    let paymentData: { id?: string; payment_url?: string; pix_key?: string } | null = null;
+
+    try {
+      paymentData = await createPayment({
+        orderId: order.id,
+        amount: Number(order.totalPrice),
+        description: product.name,
+      });
+
+      await orderService.updateOrderStatus(order.id, 'PENDING', {
+        paymentId: paymentData.id,
+        paymentUrl: paymentData.payment_url,
+        pixKey: paymentData.pix_key || config.payment.pixKey,
+      });
+    } catch (error) {
+      logger.warn('Falha ao gerar pagamento, seguindo com fallback de PIX', {
+        orderId: order.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     // Registrar auditoria
     await auditService.createAuditLog({
@@ -809,7 +831,7 @@ async function handleButtonInteraction(interaction: ButtonInteraction): Promise<
       return;
     }
 
-    const pixKey = config.payment.pixKey || 'Será informada em breve';
+    const pixKey = order.pixKey || config.payment.pixKey || 'Será informada em breve';
 
     await interaction.reply({
         embeds: [
